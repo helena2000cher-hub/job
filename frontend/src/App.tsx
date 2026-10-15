@@ -150,7 +150,15 @@ export default function App() {
               <Spinner className="h-6 w-6" />
             </div>
           )}
-          {session.status === 'error' && <p className="text-rose-600">Сервер недоступен: {session.message}</p>}
+          {session.status === 'error' && (
+            <div className="mx-auto max-w-lg rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+              <p className="font-semibold">Сервер не отвечает</p>
+              <p className="mt-1">{session.message}</p>
+              <p className="mt-2 text-rose-700/80 dark:text-rose-300/80">
+                Сайт открывается по адресу <strong>localhost:8000</strong> после двойного клика по start.bat.
+              </p>
+            </div>
+          )}
           {showLogin && session.status !== 'loading' && (
             <LoginPage canGoBack={me !== null} onBack={() => go('feed')} />
           )}

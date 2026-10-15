@@ -126,6 +126,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     // fetch падает без ответа, только когда сервер недоступен
     throw new ApiError(0, OFFLINE_MESSAGE)
   }
+  // 502/504 отдаёт прокси разработки (localhost:5173), когда сам сервер на :8000 выключен
+  if (response.status === 502 || response.status === 504) {
+    throw new ApiError(0, OFFLINE_MESSAGE)
+  }
   if (!response.ok) {
     let message = `Ошибка ${response.status}`
     try {
