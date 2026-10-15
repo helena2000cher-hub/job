@@ -2,8 +2,9 @@ import { AlertTriangle, ExternalLink, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { api } from '../api'
-import type { Mark, VacancyDetail } from '../api'
+import type { Application, Mark, VacancyDetail } from '../api'
 import { formatDate, formatSalary, sourceLabel } from '../format'
+import { ApplicationPanel } from './ApplicationPanel'
 import { buttonClass } from './styles'
 import { Button, Chip, ScoreBadge, Spinner } from './ui'
 
@@ -11,9 +12,10 @@ interface Props {
   id: string
   onClose: () => void
   onMark: (id: string, status: Mark) => void
+  onApplicationChange?: (id: string, application: Application | null) => void
 }
 
-export function VacancyDrawer({ id, onClose, onMark }: Props) {
+export function VacancyDrawer({ id, onClose, onMark, onApplicationChange }: Props) {
   const [vacancy, setVacancy] = useState<VacancyDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -37,6 +39,20 @@ export function VacancyDrawer({ id, onClose, onMark }: Props) {
   const mark = (status: Mark) => {
     onMark(id, status)
     setVacancy((v) => (v ? { ...v, mark: status } : v))
+  }
+
+  const changeApplication = (application: Application | null) => {
+    setVacancy((v) =>
+      v
+        ? {
+            ...v,
+            application,
+            stage: application?.stage ?? null,
+            mark: v.mark === 'hidden' ? 'hidden' : application ? 'saved' : null,
+          }
+        : v,
+    )
+    onApplicationChange?.(id, application)
   }
 
   return (
@@ -77,13 +93,12 @@ export function VacancyDrawer({ id, onClose, onMark }: Props) {
               <a href={vacancy.url} target="_blank" rel="noreferrer" className={buttonClass('primary')}>
                 Открыть и откликнуться <ExternalLink className="h-4 w-4" />
               </a>
-              <Button onClick={() => mark(vacancy.mark === 'saved' ? null : 'saved')}>
-                {vacancy.mark === 'saved' ? '★ Сохранено' : '☆ Сохранить'}
-              </Button>
               <Button variant="ghost" onClick={() => mark(vacancy.mark === 'hidden' ? null : 'hidden')}>
                 {vacancy.mark === 'hidden' ? 'Вернуть в ленту' : 'Скрыть'}
               </Button>
             </div>
+
+            <ApplicationPanel vacancyId={vacancy.id} application={vacancy.application} onChange={changeApplication} />
 
             {vacancy.score !== null && (
               <section className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">

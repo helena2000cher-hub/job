@@ -2,6 +2,20 @@
 
 export type Mark = 'saved' | 'hidden' | null
 
+export type Stage = 'interesting' | 'applied' | 'interview' | 'offer' | 'rejected'
+
+export type Tone = 'business' | 'friendly'
+
+export interface Application {
+  stage: Stage
+  notes: string
+  contact: string
+  applied_at: string | null
+  cover_letter: string
+  cover_letter_subject: string
+  updated_at: string
+}
+
 export interface FeedItem {
   id: string
   title: string
@@ -21,6 +35,11 @@ export interface FeedItem {
   missing_skills: string[]
   red_flags: string[]
   mark: Mark
+  stage: Stage | null
+}
+
+export interface TrackerItem extends FeedItem {
+  application: Application
 }
 
 export interface VacancyDetail extends FeedItem {
@@ -33,6 +52,7 @@ export interface VacancyDetail extends FeedItem {
   conditions: string | null
   skills: string[]
   fetched_at: string
+  application: Application | null
 }
 
 export interface Feed {
@@ -107,6 +127,19 @@ export const api = {
     request(`/api/vacancies/${encodeURIComponent(id)}/mark`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
+    }),
+  applications: () => request<TrackerItem[]>('/api/applications'),
+  updateApplication: (id: string, patch: Partial<Omit<Application, 'updated_at'>>) =>
+    request<Application>(`/api/applications/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    }),
+  deleteApplication: (id: string) =>
+    fetch(`/api/applications/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  coverLetter: (id: string, tone: Tone, wishes: string) =>
+    request<Application>(`/api/applications/${encodeURIComponent(id)}/cover-letter`, {
+      method: 'POST',
+      body: JSON.stringify({ tone, wishes }),
     }),
   profile: () => request<Profile>('/api/profile'),
   saveProfile: (profile: Profile) =>

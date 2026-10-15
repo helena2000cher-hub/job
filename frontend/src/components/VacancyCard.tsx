@@ -2,6 +2,7 @@ import { Bookmark, BookmarkCheck, EyeOff, Eye, House, MapPin, ExternalLink } fro
 import type { ReactNode } from 'react'
 import type { FeedItem, Mark } from '../api'
 import { formatDate, formatSalary, sourceLabel } from '../format'
+import { STAGES } from '../stages'
 import { Chip, ScoreBadge } from './ui'
 
 interface Props {
@@ -61,10 +62,11 @@ export function VacancyCard({ item, onOpen, onMark }: Props) {
 
           <div className="mt-3 flex flex-wrap items-center gap-1 text-xs text-slate-400">
             <span>{sourceLabel(item.source)}</span>
+            {item.stage && <StagePill stage={item.stage} />}
             {item.published_at && <span>· {formatDate(item.published_at)}</span>}
             <div className="ml-auto flex items-center gap-1">
               <IconButton
-                label={saved ? 'Убрать из сохранённых' : 'Сохранить'}
+                label={saved ? 'Убрать из трекера' : 'Добавить в трекер откликов'}
                 active={saved}
                 onClick={() => onMark(saved ? null : 'saved')}
               >
@@ -118,5 +120,16 @@ function IconButton({
     >
       {children}
     </button>
+  )
+}
+
+function StagePill({ stage }: { stage: string }) {
+  const s = STAGES.find((x) => x.id === stage)
+  if (!s) return null
+  return (
+    <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} aria-hidden />
+      {s.label}
+    </span>
   )
 }

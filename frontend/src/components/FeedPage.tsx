@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { api } from '../api'
-import type { Feed, FeedView, Mark } from '../api'
+import type { Application, Feed, FeedView, Mark } from '../api'
 import { formatDateTime, sourceLabel } from '../format'
 import { EmptyState, Spinner } from './ui'
 import { VacancyCard } from './VacancyCard'
@@ -15,7 +15,7 @@ const SCORE_FILTERS = [
 
 const VIEWS: { value: FeedView; label: string }[] = [
   { value: 'all', label: 'Лента' },
-  { value: 'saved', label: 'Сохранённые' },
+  { value: 'saved', label: 'В трекере' },
   { value: 'hidden', label: 'Скрытые' },
 ]
 
@@ -65,6 +65,26 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
       })
       api.mark(id, status).catch((e: Error) => setError(e.message))
     },
+    [view],
+  )
+
+  const applicationChanged = useCallback(
+    (id: string, application: Application | null) =>
+      setFeed((f) => {
+        if (!f) return f
+        const items = f.items
+          .map((i) =>
+            i.id === id
+              ? {
+                  ...i,
+                  stage: application?.stage ?? null,
+                  mark: (i.mark === 'hidden' ? 'hidden' : application ? 'saved' : null) as Mark,
+                }
+              : i,
+          )
+          .filter((i) => !(view === 'saved' && i.id === id && !application))
+        return { ...f, items }
+      }),
     [view],
   )
 
@@ -156,7 +176,13 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
         )}
       </section>
 
-      {openId && <VacancyDrawer key={openId} id={openId} onClose={closeDrawer} onMark={mark} />}
+      {openId && <VacancyDrawer
+          key={openId}
+          id={openId}
+          onClose={closeDrawer}
+          onMark={mark}
+          onApplicationChange={applicationChanged}
+        />}
     </div>
   )
 }

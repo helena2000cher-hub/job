@@ -64,10 +64,28 @@ class VacancyEmbedding(SQLModel, table=True):
 
 
 class VacancyMark(SQLModel, table=True):
-    """User's own decision about a vacancy: saved for later or hidden from the feed."""
+    """Vacancy hidden from the feed. ("saved" was the pre-tracker mark — now an Application.)"""
 
     vacancy_id: str = Field(primary_key=True, foreign_key="vacancy.id")
-    status: str  # "saved" | "hidden"
+    status: str  # "hidden"
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+# Колонки трекера откликов, в порядке движения по воронке
+STAGES = ("interesting", "applied", "interview", "offer", "rejected")
+
+
+class Application(SQLModel, table=True):
+    """A vacancy in the application tracker (kanban)."""
+
+    vacancy_id: str = Field(primary_key=True, foreign_key="vacancy.id")
+    stage: str = Field(default="interesting", index=True)
+    notes: str = ""
+    contact: str = ""
+    applied_at: date | None = None
+    cover_letter: str = ""
+    cover_letter_subject: str = ""
+    created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
 

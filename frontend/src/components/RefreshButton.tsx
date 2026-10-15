@@ -80,7 +80,12 @@ export function RefreshButton({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="relative" ref={panel}>
-      <Button variant="primary" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+      <Button
+        variant="primary"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label={running ? 'Обновляется' : 'Обновить'}
+      >
         {running ? <Spinner /> : <RefreshCw className="h-4 w-4" aria-hidden />}
         <span className="hidden sm:inline">{running ? 'Обновляется…' : 'Обновить'}</span>
       </Button>
