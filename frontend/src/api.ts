@@ -81,6 +81,7 @@ export interface Profile {
   industries: string[]
   education: string | null
   summary: string
+  extra: string
   search_queries: string[]
   preferences: Preferences
 }

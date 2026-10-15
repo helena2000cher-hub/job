@@ -41,3 +41,10 @@ def test_profile_roundtrip_and_fingerprint(tmp_path):
     assert loaded.fingerprint() == profile.fingerprint()
     loaded.skills.append("Python")
     assert loaded.fingerprint() != profile.fingerprint()
+
+
+def test_extra_skills_reach_matching_text():
+    profile = Profile(headline="А", target_roles=["А"], skills=["SQL"])
+    assert "Дополнительно" not in profile.matching_text()
+    profile.extra = "Make, Google Таблицы"
+    assert "Дополнительно (нет в резюме): Make, Google Таблицы" in profile.matching_text()

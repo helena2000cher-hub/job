@@ -39,20 +39,22 @@ class Profile(BaseModel):
     industries: list[str] = Field(default_factory=list)
     education: str | None = None
     summary: str = ""
+    extra: str = Field(default="", description="что умею, но нет в резюме — пишется вручную")
     search_queries: list[str] = Field(default_factory=list, description="запросы для сбора")
     preferences: Preferences = Field(default_factory=Preferences)
 
     def matching_text(self) -> str:
         """Compact description used for embeddings and as LLM context."""
-        return "\n".join(
-            [
-                f"Целевые роли: {', '.join(self.target_roles)}",
-                f"Навыки: {', '.join(self.skills)}",
-                f"Опыт: {self.experience_years or '?'} лет, уровень: {self.seniority or '?'}",
-                f"Отрасли: {', '.join(self.industries)}",
-                f"О себе: {self.summary}",
-            ]
-        )
+        lines = [
+            f"Целевые роли: {', '.join(self.target_roles)}",
+            f"Навыки: {', '.join(self.skills)}",
+            f"Опыт: {self.experience_years or '?'} лет, уровень: {self.seniority or '?'}",
+            f"Отрасли: {', '.join(self.industries)}",
+            f"О себе: {self.summary}",
+        ]
+        if self.extra.strip():
+            lines.append(f"Дополнительно (нет в резюме): {self.extra.strip()}")
+        return "\n".join(lines)
 
     def fingerprint(self) -> str:
         """Changes whenever the profile changes — cached match scores are then recomputed."""
@@ -131,7 +133,8 @@ def main(argv: list[str] | None = None) -> int:
 
     profile = build_profile(read_resume(args.resume), PolzaLLM())
     if PROFILE_PATH.exists() and not args.reset_preferences:
-        profile.preferences = load_profile().preferences
+        old = load_profile()
+        profile.preferences, profile.extra = old.preferences, old.extra
     save_profile(profile)
 
     print(f"Профиль сохранён: {PROFILE_PATH}")

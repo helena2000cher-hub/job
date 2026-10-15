@@ -408,7 +408,7 @@ def create_app(
         old = current_profile(ws)
         profile = build_profile(read_resume(ws.resume_path), llm_factory())
         if old:
-            profile.preferences = old.preferences  # ручные настройки не теряем
+            profile.preferences, profile.extra = old.preferences, old.extra  # ручное не теряем
         save_profile(profile, ws.profile_path)
         return profile
 

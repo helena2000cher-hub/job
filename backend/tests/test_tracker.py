@@ -115,7 +115,8 @@ def test_cover_letter_endpoint_saves_into_application(setup):
     system, user, smart = llm.chat_calls[0]
     assert smart is False  # письма пишет быстрая (дешёвая) модель
     assert "живой" in user and "коротко" in user
-    assert "Не хватает: SQL" in user
+    assert "СИЛЬНЫЕ СОВПАДЕНИЯ С ВАКАНСИЕЙ\nBPMN" in user
+    assert "SQL" not in user.split("ВАКАНСИЯ")[-1]  # пробелы в письмо не передаются
     assert "345-67-89" not in user  # контакты из резюме вычищены
 
 
@@ -153,3 +154,21 @@ def test_old_saved_marks_migrate_to_tracker(tmp_path, profile):
     with Session(engine) as s:
         assert s.get(VacancyMark, "test:1") is None
         assert s.get(Application, "test:1").stage == "interesting"
+
+
+def test_letter_normalizes_escaped_newlines(profile, tmp_path):
+    raw = {"subject": "Тема\n", "letter": "Абзац один.\n\nАбзац два.  \n\n\n\nТри."}
+    letter = generate_cover_letter(
+        profile, make_vacancy(1, "А"), None, FakeLLM([raw]), resume_path=tmp_path / "no.pdf"
+    )
+    assert letter.letter == "Абзац один.\n\nАбзац два.\n\nТри."
+    assert letter.subject == "Тема"
+
+
+def test_letter_prompt_sells_strengths(profile, tmp_path):
+    llm = FakeLLM([LETTER])
+    profile.extra = "Make — проходила на курсе"
+    generate_cover_letter(profile, make_vacancy(1, "А"), None, llm, resume_path=tmp_path / "x")
+    system, user, _ = llm.chat_calls[0]
+    assert "НЕ перечисляй, чего у кандидата нет" in system
+    assert "Дополнительно (нет в резюме): Make — проходила на курсе" in user

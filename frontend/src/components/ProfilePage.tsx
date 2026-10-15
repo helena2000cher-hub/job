@@ -148,6 +148,18 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
         <Field label={`Навыки (${profile.skills.length})`}>
           <TagEditor values={profile.skills} onChange={(v) => set('skills', v)} placeholder="Добавить навык" />
         </Field>
+        <Field
+          label="Что ещё умею (нет в резюме)"
+          hint="Учитывается при оценке вакансий и в сопроводительных письмах. Пишите как есть: где применяли, на каком уровне."
+        >
+          <textarea
+            rows={3}
+            className={INPUT}
+            value={profile.extra ?? ''}
+            placeholder="Например: Make — проходила на курсе; Google Таблицы и Документы — уверенно; CRM — как пользователь"
+            onChange={(e) => set('extra', e.target.value)}
+          />
+        </Field>
       </Card>
 
       <Card title="Что и где искать">
