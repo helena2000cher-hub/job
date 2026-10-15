@@ -30,13 +30,13 @@
 
 ## Стек
 
-**Backend:** Python 3.12 · FastAPI · SQLModel/SQLite · httpx · OpenAI SDK (polza.ai: Claude, bge-m3) · Exa · pypdf · pytest · ruff
+**Backend:** Python 3.12 · FastAPI · SQLModel/SQLite · httpx · OpenAI SDK (polza.ai: DeepSeek, Claude Haiku, bge-m3) · Exa · pypdf · pytest · ruff
 **Frontend:** React 19 · TypeScript · Vite · Tailwind CSS 4 · lucide-react
 
 ## Быстрый старт
 
-**Windows, когда всё уже установлено:** двойной клик по `start.bat` — откроется http://localhost:8000.
-Чтобы остановить, закройте чёрное окно.
+**Windows, когда всё уже установлено:** двойной клик по `start.bat` — откроется http://localhost:8000
+(сервер работает в свёрнутом окне). Остановить — `stop.bat`.
 
 ```bash
 # backend

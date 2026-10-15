@@ -1,7 +1,7 @@
-import { Bookmark, BookmarkCheck, EyeOff, Eye, House, MapPin, ExternalLink } from 'lucide-react'
+import { Bookmark, BookmarkCheck, ExternalLink, Eye, EyeOff, House, MapPin, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { FeedItem, Mark } from '../api'
-import { formatDate, formatSalary, sourceLabel } from '../format'
+import { fitLabel, formatDate, formatSalary, sourceLabel } from '../format'
 import { STAGES } from '../stages'
 import { Chip, ScoreBadge } from './ui'
 
@@ -18,7 +18,10 @@ export function VacancyCard({ item, onOpen, onMark }: Props) {
   return (
     <article className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-300 hover:shadow-md sm:p-5 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500/50">
       <div className="flex gap-4">
-        <ScoreBadge score={item.score} />
+        <div className="flex w-16 shrink-0 flex-col items-center gap-1 text-center">
+          <ScoreBadge score={item.score} />
+          <span className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">{fitLabel(item.score)}</span>
+        </div>
 
         <div className="min-w-0 flex-1">
           <button
@@ -49,15 +52,11 @@ export function VacancyCard({ item, onOpen, onMark }: Props) {
             <p className="mt-2 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{item.verdict}</p>
           )}
 
-          {(item.matched_skills.length > 0 || item.missing_skills.length > 0) && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {item.matched_skills.slice(0, 5).map((skill) => (
-                <Chip key={`m-${skill}`} tone="match">✓ {skill}</Chip>
-              ))}
-              {item.missing_skills.slice(0, 3).map((skill) => (
-                <Chip key={`x-${skill}`} tone="missing">✗ {skill}</Chip>
-              ))}
-            </div>
+          {item.matched_skills.length > 0 && (
+            <SkillRow label="Совпадает" tone="match" skills={item.matched_skills} max={6} />
+          )}
+          {item.missing_skills.length > 0 && (
+            <SkillRow label="Не хватает" tone="missing" skills={item.missing_skills} max={4} />
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-1 text-xs text-slate-400">
@@ -65,6 +64,13 @@ export function VacancyCard({ item, onOpen, onMark }: Props) {
             {item.stage && <StagePill stage={item.stage} />}
             {item.published_at && <span>· {formatDate(item.published_at)}</span>}
             <div className="ml-auto flex items-center gap-1">
+              <button
+                type="button"
+                onClick={onOpen}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+              >
+                <Sparkles className="h-3.5 w-3.5" aria-hidden /> Подробнее и письмо
+              </button>
               <IconButton
                 label={saved ? 'Убрать из трекера' : 'Добавить в трекер откликов'}
                 active={saved}
@@ -131,5 +137,30 @@ function StagePill({ stage }: { stage: string }) {
       <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} aria-hidden />
       {s.label}
     </span>
+  )
+}
+
+function SkillRow({
+  label,
+  tone,
+  skills,
+  max,
+}: {
+  label: string
+  tone: 'match' | 'missing'
+  skills: string[]
+  max: number
+}) {
+  const rest = skills.length - max
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <span className="w-[5.5rem] shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">{label}:</span>
+      {skills.slice(0, max).map((skill) => (
+        <Chip key={skill} tone={tone}>
+          {skill}
+        </Chip>
+      ))}
+      {rest > 0 && <span className="text-xs text-slate-400">и ещё {rest}</span>}
+    </div>
   )
 }

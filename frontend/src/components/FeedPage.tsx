@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
 import { api } from '../api'
 import type { Application, Feed, FeedView, Mark } from '../api'
 import { formatDateTime, sourceLabel } from '../format'
@@ -8,19 +7,19 @@ import { VacancyCard } from './VacancyCard'
 import { VacancyDrawer } from './VacancyDrawer'
 
 const SCORE_FILTERS = [
-  { value: 0, label: 'Все' },
-  { value: 60, label: '60+' },
-  { value: 80, label: '80+' },
+  { value: 0, label: 'Все баллы' },
+  { value: 60, label: 'от 60' },
+  { value: 80, label: 'от 80' },
 ]
 
 const VIEWS: { value: FeedView; label: string }[] = [
-  { value: 'all', label: 'Лента' },
+  { value: 'all', label: 'Подобранные' },
   { value: 'saved', label: 'В трекере' },
   { value: 'hidden', label: 'Скрытые' },
 ]
 
 interface Props {
-  reloadKey: number // меняется после «Обновить» — лента перезагружается
+  reloadKey: number // меняется после «Найти вакансии» — лента перезагружается
   onGoToProfile: () => void
 }
 
@@ -90,40 +89,46 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
 
   const closeDrawer = useCallback(() => setOpenId(null), [])
 
+  const items = feed?.items ?? []
+  const counts = {
+    great: items.filter((i) => (i.score ?? 0) >= 80).length,
+    good: items.filter((i) => (i.score ?? 0) >= 60 && (i.score ?? 0) < 80).length,
+  }
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[15rem_1fr]">
-      <aside className="space-y-5 lg:sticky lg:top-20 lg:self-start">
-        <FilterGroup label="Показать">
-          <Segmented options={VIEWS} value={view} onChange={setView} />
-        </FilterGroup>
-
-        <FilterGroup label="Минимальный балл">
-          <Segmented options={SCORE_FILTERS} value={minScore} onChange={changeMinScore} />
-        </FilterGroup>
-
-        <FilterGroup label="Источник">
-          <select
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            className="w-full rounded-lg border-0 bg-white px-3 py-2 text-sm ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-indigo-500 dark:bg-slate-900 dark:ring-slate-700"
-          >
-            <option value="">Все источники</option>
-            {Object.entries(feed?.sources ?? {}).map(([name, count]) => (
-              <option key={name} value={name}>
-                {sourceLabel(name)} ({count})
-              </option>
-            ))}
-          </select>
-        </FilterGroup>
-
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Вакансии под ваш профиль</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Нейросеть сравнила каждую вакансию с вашими навыками: сверху — самые подходящие. Откройте
+            вакансию, чтобы увидеть, чего не хватает, и создать сопроводительное письмо.
+          </p>
+        </div>
         {feed && (
-          <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-            Оценено {feed.scored} из {feed.total_vacancies} вакансий в базе.
-            <br />
-            Последний сбор: {formatDateTime(feed.last_fetched_at)}
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            В базе {feed.total_vacancies} · оценено {feed.scored} · сбор: {formatDateTime(feed.last_fetched_at)}
           </p>
         )}
-      </aside>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+        <Segmented options={VIEWS} value={view} onChange={setView} label="Какие вакансии показать" />
+        <Segmented options={SCORE_FILTERS} value={minScore} onChange={changeMinScore} label="Минимальный балл" />
+        <select
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          aria-label="Источник"
+          className="rounded-lg border-0 bg-slate-100 px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800"
+        >
+          <option value="">Все сайты</option>
+          {Object.entries(feed?.sources ?? {}).map(([name, count]) => (
+            <option key={name} value={name}>
+              {sourceLabel(name)} ({count})
+            </option>
+          ))}
+        </select>
+      </div>
 
       <section aria-live="polite" className="min-w-0">
         {error && (
@@ -148,22 +153,30 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
           </EmptyState>
         )}
 
-        {feed?.profile_ready && feed.items.length === 0 && (
+        {feed?.profile_ready && items.length === 0 && (
           <EmptyState title={view === 'all' ? 'Подходящих вакансий пока нет' : 'Здесь пусто'}>
             {view === 'all' &&
               (feed.scored === 0
-                ? 'Нажмите «Обновить», чтобы собрать и оценить вакансии под ваш профиль.'
-                : 'Попробуйте снизить минимальный балл или выбрать другой источник.')}
+                ? 'Нажмите «Найти вакансии» справа вверху — сервис соберёт вакансии по вашим навыкам и оценит их.'
+                : 'Попробуйте показать все баллы или выбрать другой сайт.')}
           </EmptyState>
         )}
 
-        {feed && feed.items.length > 0 && (
+        {items.length > 0 && (
           <>
-            <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-              {feed.items.length} {plural(feed.items.length, 'вакансия', 'вакансии', 'вакансий')}
+            <p className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-300">
+              <span>
+                {items.length} {plural(items.length, 'вакансия', 'вакансии', 'вакансий')}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden /> подходят: {counts.great}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden /> можно откликнуться: {counts.good}
+              </span>
             </p>
             <div className="space-y-3">
-              {feed.items.map((item) => (
+              {items.map((item) => (
                 <VacancyCard
                   key={item.id}
                   item={item}
@@ -176,22 +189,15 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
         )}
       </section>
 
-      {openId && <VacancyDrawer
+      {openId && (
+        <VacancyDrawer
           key={openId}
           id={openId}
           onClose={closeDrawer}
           onMark={mark}
           onApplicationChange={applicationChanged}
-        />}
-    </div>
-  )
-}
-
-function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
-      {children}
+        />
+      )}
     </div>
   )
 }
@@ -200,13 +206,15 @@ function Segmented<T extends string | number>({
   options,
   value,
   onChange,
+  label,
 }: {
   options: { value: T; label: string }[]
   value: T
   onChange: (value: T) => void
+  label: string
 }) {
   return (
-    <div className="flex rounded-lg bg-slate-200/70 p-0.5 dark:bg-slate-800" role="radiogroup">
+    <div className="flex rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800" role="radiogroup" aria-label={label}>
       {options.map((o) => (
         <button
           key={String(o.value)}
@@ -214,7 +222,7 @@ function Segmented<T extends string | number>({
           role="radio"
           aria-checked={o.value === value}
           onClick={() => onChange(o.value)}
-          className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition ${
+          className={`rounded-md px-3 py-1 text-sm font-medium transition ${
             o.value === value
               ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-slate-100'
               : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'

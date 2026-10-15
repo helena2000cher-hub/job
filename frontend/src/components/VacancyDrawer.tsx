@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { api } from '../api'
 import type { Application, Mark, VacancyDetail } from '../api'
 import { formatDate, formatSalary, sourceLabel } from '../format'
-import { ApplicationPanel } from './ApplicationPanel'
+import { ApplicationPanel, CoverLetter } from './ApplicationPanel'
 import { buttonClass } from './styles'
 import { Button, Chip, ScoreBadge, Spinner } from './ui'
 
@@ -91,14 +91,12 @@ export function VacancyDrawer({ id, onClose, onMark, onApplicationChange }: Prop
 
             <div className="flex flex-wrap gap-2">
               <a href={vacancy.url} target="_blank" rel="noreferrer" className={buttonClass('primary')}>
-                Открыть и откликнуться <ExternalLink className="h-4 w-4" />
+                Открыть вакансию на сайте <ExternalLink className="h-4 w-4" />
               </a>
               <Button variant="ghost" onClick={() => mark(vacancy.mark === 'hidden' ? null : 'hidden')}>
                 {vacancy.mark === 'hidden' ? 'Вернуть в ленту' : 'Скрыть'}
               </Button>
             </div>
-
-            <ApplicationPanel vacancyId={vacancy.id} application={vacancy.application} onChange={changeApplication} />
 
             {vacancy.score !== null && (
               <section className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">
@@ -121,6 +119,8 @@ export function VacancyDrawer({ id, onClose, onMark, onApplicationChange }: Prop
               </section>
             )}
 
+            <CoverLetter vacancyId={vacancy.id} application={vacancy.application} onChange={changeApplication} />
+
             <Section title="Обязанности">{vacancy.duties}</Section>
             <Section title="Требования">{vacancy.requirements}</Section>
             <Section title="Условия">{vacancy.conditions}</Section>
@@ -140,6 +140,8 @@ export function VacancyDrawer({ id, onClose, onMark, onApplicationChange }: Prop
               <Fact label="Опыт" value={vacancy.experience_years !== null ? `${vacancy.experience_years} лет` : null} />
               <Fact label="Образование" value={vacancy.education} />
             </dl>
+
+            <ApplicationPanel vacancyId={vacancy.id} application={vacancy.application} onChange={changeApplication} />
           </div>
         )}
       </aside>

@@ -113,7 +113,7 @@ def test_cover_letter_endpoint_saves_into_application(setup):
     assert result["cover_letter_subject"] == LETTER["subject"]
     assert result["stage"] == "interesting"  # вакансия попала в трекер
     system, user, smart = llm.chat_calls[0]
-    assert smart is True
+    assert smart is False  # письма пишет быстрая (дешёвая) модель
     assert "живой" in user and "коротко" in user
     assert "Не хватает: SQL" in user
     assert "345-67-89" not in user  # контакты из резюме вычищены

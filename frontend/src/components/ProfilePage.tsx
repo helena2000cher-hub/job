@@ -35,7 +35,7 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
     setMessage(null)
     try {
       load(await api.saveProfile(profile))
-      setMessage({ tone: 'ok', text: 'Сохранено. Нажмите «Обновить» → «Пересчитать оценки», чтобы лента учла изменения.' })
+      setMessage({ tone: 'ok', text: 'Сохранено. Нажмите «Найти вакансии» → снимите галочки → «Пересчитать оценки», чтобы лента учла изменения.' })
       onSaved()
     } catch (e) {
       setMessage({ tone: 'error', text: (e as Error).message })
@@ -151,7 +151,7 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
       </Card>
 
       <Card title="Что и где искать">
-        <Field label="Поисковые запросы" hint="По ним собираются вакансии при «Обновить»">
+        <Field label="Поисковые запросы" hint="По ним ищутся вакансии при «Найти вакансии»">
           <TagEditor values={profile.search_queries} onChange={(v) => set('search_queries', v)} placeholder="Добавить запрос" />
         </Field>
         <label className="flex items-center gap-3">

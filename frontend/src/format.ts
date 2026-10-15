@@ -44,3 +44,10 @@ export function formatDateTime(value: string | null): string {
     minute: '2-digit',
   })
 }
+
+export function fitLabel(score: number | null): string {
+  if (score === null) return 'не оценена'
+  if (score >= 80) return 'подходит'
+  if (score >= 60) return 'можно откликнуться'
+  return 'слабое совпадение'
+}

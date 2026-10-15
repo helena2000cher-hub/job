@@ -67,7 +67,8 @@ def generate_cover_letter(
     if wishes.strip():
         parts.append(f"ПОЖЕЛАНИЯ КАНДИДАТА К ПИСЬМУ\n{wishes.strip()}")
 
-    data = llm.chat_json(SYSTEM_PROMPT, "\n\n".join(parts), smart=True)
+    # Быстрая модель: по тесту пишет не хуже дорогой, а стоит в десятки раз меньше
+    data = llm.chat_json(SYSTEM_PROMPT, "\n\n".join(parts))
     letter = str(data.get("letter", "")).strip()
     if not letter:
         raise ValueError("Модель вернула пустое письмо")

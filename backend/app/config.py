@@ -16,8 +16,8 @@ class Settings(BaseSettings):
 
     polza_api_key: str = ""
     polza_base_url: str = "https://polza.ai/api/v1/"
-    llm_model_fast: str = "anthropic/claude-haiku-5.5"
-    llm_model_smart: str = "anthropic/claude-sonnet-5.5"
+    llm_model_fast: str = "deepseek/deepseek-v4.1-flash"  # оценка вакансий и письма
+    llm_model_smart: str = "anthropic/claude-haiku-5.5"  # разбор резюме (разово)
     embedding_model: str = "baai/bge-m3"
 
     exa_api_key: str = ""

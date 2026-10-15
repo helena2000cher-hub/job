@@ -5,7 +5,7 @@ import type { RefreshState } from '../api'
 import { Button, Spinner } from './ui'
 
 const SOURCES = [
-  { id: 'exa', label: 'hh.ru, Хабр Карьера, сайты компаний', hint: 'через Exa · ≈ $0.5 за обновление' },
+  { id: 'exa', label: 'hh.ru, Хабр Карьера, сайты компаний', hint: 'поиск через Exa · ≈ $0.5 из бесплатных $10 в месяц' },
   { id: 'trudvsem', label: 'Работа России', hint: 'бесплатно · медленно, 3–6 минут' },
 ]
 
@@ -84,17 +84,17 @@ export function RefreshButton({ onDone }: { onDone: () => void }) {
         variant="primary"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-label={running ? 'Обновляется' : 'Обновить'}
+        aria-label={running ? 'Идёт поиск' : 'Найти вакансии'}
       >
         {running ? <Spinner /> : <RefreshCw className="h-4 w-4" aria-hidden />}
-        <span className="hidden sm:inline">{running ? 'Обновляется…' : 'Обновить'}</span>
+        <span className="hidden sm:inline">{running ? 'Идёт поиск…' : 'Найти вакансии'}</span>
       </Button>
 
       {open && (
         <div className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900">
           {!running && (
             <>
-              <p className="text-sm font-semibold">Где искать новые вакансии</p>
+              <p className="text-sm font-semibold">Где искать вакансии по вашим навыкам</p>
               <div className="mt-3 space-y-2">
                 {SOURCES.map((s) => (
                   <label
@@ -117,10 +117,10 @@ export function RefreshButton({ onDone }: { onDone: () => void }) {
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                 {selected.length === 0
                   ? 'Ничего не выбрано — только пересчитаем оценки под текущий профиль.'
-                  : 'После сбора лучшие совпадения оценит нейросеть.'}
+                  : 'Запросы берутся из профиля. Лучшие совпадения оценит нейросеть (≈ 2 ₽ за поиск).'}
               </p>
               <Button variant="primary" className="mt-3 w-full" onClick={start}>
-                {selected.length === 0 ? 'Пересчитать оценки' : 'Начать'}
+                {selected.length === 0 ? 'Пересчитать оценки' : 'Найти и оценить'}
               </Button>
             </>
           )}

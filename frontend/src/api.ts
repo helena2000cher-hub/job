@@ -112,11 +112,20 @@ export class ApiError extends Error {
 
 export type FeedView = 'all' | 'saved' | 'hidden'
 
+export const OFFLINE_MESSAGE =
+  'Нет связи с сервером. Скорее всего, он остановлен — запустите start.bat ещё раз и обновите страницу.'
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-  })
+  let response: Response
+  try {
+    response = await fetch(path, {
+      ...init,
+      headers: { 'Content-Type': 'application/json', ...init?.headers },
+    })
+  } catch {
+    // fetch падает без ответа, только когда сервер недоступен
+    throw new ApiError(0, OFFLINE_MESSAGE)
+  }
   if (!response.ok) {
     let message = `Ошибка ${response.status}`
     try {

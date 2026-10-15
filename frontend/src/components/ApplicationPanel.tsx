@@ -16,7 +16,7 @@ interface Props {
 const INPUT =
   'w-full rounded-lg border-0 bg-white px-3 py-2 text-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 dark:bg-slate-950 dark:ring-slate-700'
 
-/** Отклик на вакансию: этап, заметки, контакт и сопроводительное письмо. */
+/** Вакансия в трекере откликов: этап, дата, контакт, заметки. */
 export function ApplicationPanel({ vacancyId, application, onChange }: Props) {
   const [error, setError] = useState<string | null>(null)
 
@@ -36,9 +36,9 @@ export function ApplicationPanel({ vacancyId, application, onChange }: Props) {
   }
 
   return (
-    <section className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 dark:border-indigo-500/30 dark:bg-indigo-500/5">
+    <section className="space-y-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Отклик</h3>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Трекер откликов</h3>
         {application && (
           <button
             type="button"
@@ -109,14 +109,13 @@ export function ApplicationPanel({ vacancyId, application, onChange }: Props) {
         </div>
       )}
 
-      <CoverLetterBlock vacancyId={vacancyId} application={application} onChange={onChange} />
-
       {error && <p className="text-xs text-rose-600">{error}</p>}
     </section>
   )
 }
 
-function CoverLetterBlock({ vacancyId, application, onChange }: Props) {
+/** Сопроводительное письмо под вакансию: генерация, правка, копирование. */
+export function CoverLetter({ vacancyId, application, onChange }: Props) {
   const [tone, setTone] = useState<Tone>('business')
   const [wishes, setWishes] = useState('')
   const [busy, setBusy] = useState(false)
@@ -156,8 +155,15 @@ function CoverLetterBlock({ vacancyId, application, onChange }: Props) {
   }
 
   return (
-    <div className="space-y-2 border-t border-indigo-200/70 pt-4 dark:border-indigo-500/20">
-      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Сопроводительное письмо</p>
+    <section className="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-500/30 dark:bg-indigo-500/5">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Сопроводительное письмо</h3>
+        {!letter && !isDemo && (
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            Нейросеть напишет письмо под эту вакансию по вашему резюме: сильные стороны и честно о пробелах.
+          </p>
+        )}
+      </div>
 
       {isDemo && !letter && (
         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -166,25 +172,33 @@ function CoverLetterBlock({ vacancyId, application, onChange }: Props) {
         </p>
       )}
 
-      <div className={isDemo ? 'hidden' : 'flex flex-wrap gap-2'}>
-        <select
-          value={tone}
-          onChange={(e) => setTone(e.target.value as Tone)}
-          className={`${INPUT} w-auto`}
-          aria-label="Тон письма"
+      <div className={isDemo ? 'hidden' : 'space-y-2'}>
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={tone}
+            onChange={(e) => setTone(e.target.value as Tone)}
+            className={`${INPUT} w-auto`}
+            aria-label="Тон письма"
+          >
+            <option value="business">Деловой тон</option>
+            <option value="friendly">Дружелюбный тон</option>
+          </select>
+          <input
+            value={wishes}
+            onChange={(e) => setWishes(e.target.value)}
+            placeholder="Пожелания (необязательно): упомянуть проект, короче…"
+            aria-label="Пожелания к письму"
+            className={`${INPUT} min-w-[12rem] flex-1`}
+          />
+        </div>
+        <Button
+          variant={letter ? 'secondary' : 'primary'}
+          onClick={generate}
+          disabled={busy}
+          className="w-full sm:w-auto"
         >
-          <option value="business">Деловой тон</option>
-          <option value="friendly">Дружелюбный тон</option>
-        </select>
-        <input
-          value={wishes}
-          onChange={(e) => setWishes(e.target.value)}
-          placeholder="Пожелания: упомянуть проект, короче…"
-          className={`${INPUT} min-w-[12rem] flex-1`}
-        />
-        <Button variant="primary" onClick={generate} disabled={busy}>
           {busy ? <Spinner /> : <Sparkles className="h-4 w-4" />}
-          {letter ? 'Написать заново' : 'Написать письмо'}
+          {letter ? 'Написать заново' : 'Создать сопроводительное письмо'}
         </Button>
       </div>
       {busy && <p className="text-xs text-slate-500">Нейросеть пишет письмо, это займёт до минуты…</p>}
@@ -207,7 +221,7 @@ function CoverLetterBlock({ vacancyId, application, onChange }: Props) {
         </div>
       )}
       {error && <p className="text-xs text-rose-600">{error}</p>}
-    </div>
+    </section>
   )
 }
 
