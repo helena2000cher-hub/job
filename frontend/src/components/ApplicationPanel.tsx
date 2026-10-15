@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { api } from '../api'
 import type { Application, Stage, Tone } from '../api'
+import { useIsDemo } from '../session'
 import { STAGES } from '../stages'
 import { Button, Spinner } from './ui'
 
@@ -122,6 +123,7 @@ function CoverLetterBlock({ vacancyId, application, onChange }: Props) {
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const letter = application?.cover_letter ?? ''
+  const isDemo = useIsDemo()
 
   const generate = async () => {
     setBusy(true)
@@ -157,7 +159,14 @@ function CoverLetterBlock({ vacancyId, application, onChange }: Props) {
     <div className="space-y-2 border-t border-indigo-200/70 pt-4 dark:border-indigo-500/20">
       <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Сопроводительное письмо</p>
 
-      <div className="flex flex-wrap gap-2">
+      {isDemo && !letter && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          В демо генерация писем отключена (это платный вызов нейросети). Пример письма — у вакансии
+          на этапе «Собеседование».
+        </p>
+      )}
+
+      <div className={isDemo ? 'hidden' : 'flex flex-wrap gap-2'}>
         <select
           value={tone}
           onChange={(e) => setTone(e.target.value as Tone)}

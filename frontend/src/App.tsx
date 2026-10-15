@@ -1,11 +1,16 @@
-import { BriefcaseBusiness, Moon, Sun } from 'lucide-react'
+import { BriefcaseBusiness, LogIn, LogOut, Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { ApiError, api } from './api'
+import type { Me } from './api'
 import { FeedPage } from './components/FeedPage'
+import { LoginPage } from './components/LoginPage'
 import { ProfilePage } from './components/ProfilePage'
 import { RefreshButton } from './components/RefreshButton'
 import { TrackerPage } from './components/TrackerPage'
+import { Spinner } from './components/ui'
+import { SessionContext } from './session'
 
-type Tab = 'feed' | 'tracker' | 'profile'
+type Tab = 'feed' | 'tracker' | 'profile' | 'login'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'feed', label: 'Вакансии' },
@@ -15,13 +20,16 @@ const TABS: { id: Tab; label: string }[] = [
 
 function tabFromHash(): Tab {
   const tab = window.location.hash.replace('#/', '')
-  return tab === 'profile' || tab === 'tracker' ? tab : 'feed'
+  return tab === 'profile' || tab === 'tracker' || tab === 'login' ? tab : 'feed'
 }
+
+type SessionState = { status: 'loading' } | { status: 'ready'; me: Me } | { status: 'login' } | { status: 'error'; message: string }
 
 export default function App() {
   const [tab, setTab] = useState<Tab>(tabFromHash)
   const [reloadKey, setReloadKey] = useState(0)
   const [dark, toggleDark] = useTheme()
+  const [session, setSession] = useState<SessionState>({ status: 'loading' })
 
   useEffect(() => {
     const onHash = () => setTab(tabFromHash())
@@ -29,60 +37,133 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
+  useEffect(() => {
+    api
+      .me()
+      .then((me) => setSession({ status: 'ready', me }))
+      .catch((e) =>
+        setSession(
+          e instanceof ApiError && e.status === 401 ? { status: 'login' } : { status: 'error', message: e.message },
+        ),
+      )
+  }, [])
+
   const go = (next: Tab) => {
     window.location.hash = `#/${next}`
   }
 
+  const logout = async () => {
+    await api.logout()
+    window.location.hash = '#/feed'
+    window.location.reload()
+  }
+
+  const me = session.status === 'ready' ? session.me : null
+  const isDemo = me?.role === 'demo'
+  const showLogin = session.status === 'login' || tab === 'login'
+
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-6">
-          <a href="#/feed" className="hidden items-center gap-2 font-semibold sm:flex">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
-              <BriefcaseBusiness className="h-4.5 w-4.5" aria-hidden />
-            </span>
-            <span className="hidden sm:inline">Job Matcher</span>
-          </a>
+    <SessionContext.Provider value={me ?? { role: 'demo', auth_enabled: true, demo_available: false }}>
+      <div className="min-h-screen">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
+          <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-6">
+            <a href="#/feed" className="hidden items-center gap-2 font-semibold sm:flex">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
+                <BriefcaseBusiness className="h-4.5 w-4.5" aria-hidden />
+              </span>
+              <span className="hidden sm:inline">Job Matcher</span>
+            </a>
 
-          <nav className="flex gap-0.5 sm:gap-1" aria-label="Разделы">
-            {TABS.map((t) => (
+            {me && (
+              <nav className="flex gap-0.5 sm:gap-1" aria-label="Разделы">
+                {TABS.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => go(t.id)}
+                    aria-current={tab === t.id ? 'page' : undefined}
+                    className={`rounded-lg px-2 py-2 text-sm font-medium transition-colors sm:px-3 ${
+                      tab === t.id
+                        ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
+                        : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </nav>
+            )}
+
+            <div className="ml-auto flex items-center gap-1 sm:gap-2">
               <button
-                key={t.id}
                 type="button"
-                onClick={() => go(t.id)}
-                aria-current={tab === t.id ? 'page' : undefined}
-                className={`rounded-lg px-2 py-2 text-sm font-medium transition-colors sm:px-3 ${
-                  tab === t.id
-                    ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
-                }`}
+                onClick={toggleDark}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                aria-label={dark ? 'Светлая тема' : 'Тёмная тема'}
+                title={dark ? 'Светлая тема' : 'Тёмная тема'}
               >
-                {t.label}
+                {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </button>
-            ))}
-          </nav>
-
-          <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            <button
-              type="button"
-              onClick={toggleDark}
-              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-              aria-label={dark ? 'Светлая тема' : 'Тёмная тема'}
-              title={dark ? 'Светлая тема' : 'Тёмная тема'}
-            >
-              {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
-            <RefreshButton onDone={() => setReloadKey((k) => k + 1)} />
+              {me?.role === 'owner' && <RefreshButton onDone={() => setReloadKey((k) => k + 1)} />}
+              {me?.role === 'owner' && me.auth_enabled && (
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                  aria-label="Выйти"
+                  title="Выйти"
+                >
+                  <LogOut className="h-5 w-5" />
+                </button>
+              )}
+              {isDemo && tab !== 'login' && (
+                <button
+                  type="button"
+                  onClick={() => go('login')}
+                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                  aria-label="Войти"
+                  title="Войти"
+                >
+                  <LogIn className="h-5 w-5" />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        {tab === 'feed' && <FeedPage reloadKey={reloadKey} onGoToProfile={() => go('profile')} />}
-        {tab === 'tracker' && <TrackerPage onGoToFeed={() => go('feed')} />}
-        {tab === 'profile' && <ProfilePage onSaved={() => setReloadKey((k) => k + 1)} />}
-      </main>
-    </div>
+        {isDemo && !showLogin && (
+          <div className="border-b border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+            <p className="mx-auto max-w-6xl px-4 py-2.5 text-sm">
+              <strong className="font-semibold">Демо-режим.</strong> Кандидат, компании и вакансии вымышлены.
+              Можно листать ленту, открывать разборы и двигать карточки в трекере — песочница периодически
+              сбрасывается. Сбор вакансий и генерация писем доступны только владельцу.{' '}
+              <a href="https://github.com/helena2000cher-hub/job" className="font-medium underline" target="_blank" rel="noreferrer">
+                Код на GitHub
+              </a>
+            </p>
+          </div>
+        )}
+
+        <main className="mx-auto max-w-6xl px-4 py-6">
+          {session.status === 'loading' && (
+            <div className="flex justify-center py-20 text-slate-400">
+              <Spinner className="h-6 w-6" />
+            </div>
+          )}
+          {session.status === 'error' && <p className="text-rose-600">Сервер недоступен: {session.message}</p>}
+          {showLogin && session.status !== 'loading' && (
+            <LoginPage canGoBack={me !== null} onBack={() => go('feed')} />
+          )}
+          {me && !showLogin && (
+            <>
+              {tab === 'feed' && <FeedPage reloadKey={reloadKey} onGoToProfile={() => go('profile')} />}
+              {tab === 'tracker' && <TrackerPage onGoToFeed={() => go('feed')} />}
+              {tab === 'profile' && <ProfilePage onSaved={() => setReloadKey((k) => k + 1)} />}
+            </>
+          )}
+        </main>
+      </div>
+    </SessionContext.Provider>
   )
 }
 

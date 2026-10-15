@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { api } from '../api'
 import type { Profile } from '../api'
+import { useIsDemo } from '../session'
 import { Button, EmptyState, Spinner } from './ui'
 
 export function ProfilePage({ onSaved }: { onSaved: () => void }) {
@@ -11,6 +12,7 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
   const [status, setStatus] = useState<'loading' | 'missing' | 'ready'>('loading')
   const [busy, setBusy] = useState<'save' | 'rebuild' | null>(null)
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
+  const isDemo = useIsDemo()
 
   const load = (p: Profile) => {
     setProfile(p)
@@ -90,11 +92,21 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
             По нему подбираются и оцениваются вакансии. Всё можно поправить вручную.
           </p>
         </div>
-        <Button onClick={rebuild} disabled={busy !== null}>
-          {busy === 'rebuild' ? <Spinner /> : <FileText className="h-4 w-4" />} Пересобрать из резюме
-        </Button>
+        {!isDemo && (
+          <Button onClick={rebuild} disabled={busy !== null}>
+            {busy === 'rebuild' ? <Spinner /> : <FileText className="h-4 w-4" />} Пересобрать из резюме
+          </Button>
+        )}
       </div>
 
+      {isDemo && (
+        <p className="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          В демо профиль только для просмотра. Владелец сайта собирает его из своего резюме нейросетью
+          и правит здесь же: навыки, роли, поисковые запросы, зарплату и стоп-слова.
+        </p>
+      )}
+
+      <fieldset disabled={isDemo} className="space-y-6 disabled:opacity-90">
       <Card title="Кто я">
         <Field label="Желаемая должность">
           <input className={INPUT} value={profile.headline} onChange={(e) => set('headline', e.target.value)} />
@@ -171,6 +183,8 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
         </Field>
       </Card>
 
+      </fieldset>
+
       {message && (
         <p
           className={`rounded-lg px-4 py-3 text-sm ${
@@ -183,7 +197,7 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
         </p>
       )}
 
-      {dirty && (
+      {dirty && !isDemo && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
           <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
             <span className="text-sm text-slate-600 dark:text-slate-300">Есть несохранённые изменения</span>

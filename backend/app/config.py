@@ -24,6 +24,13 @@ class Settings(BaseSettings):
 
     default_region_code: str = "5900000000000"  # Пермский край
 
+    # Веб-доступ. Пустой пароль — вход не нужен (локальная разработка), демо выключено.
+    app_password: str = ""
+    session_secret: str = ""  # подпись cookie; обязателен, если задан пароль
+    cookie_secure: bool = False  # True за HTTPS (на сервере)
+    demo_enabled: bool = True  # гостям без входа показывать демо на вымышленных данных
+    demo_reset_hours: float = 6  # демо-песочница сбрасывается к исходным данным
+
 
 @lru_cache
 def get_settings() -> Settings:

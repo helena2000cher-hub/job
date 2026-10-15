@@ -96,6 +96,20 @@ export interface RefreshState {
   cost_dollars: number
 }
 
+export interface Me {
+  role: 'owner' | 'demo'
+  auth_enabled: boolean
+  demo_available: boolean
+}
+
+export class ApiError extends Error {
+  status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
 export type FeedView = 'all' | 'saved' | 'hidden'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -111,12 +125,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* тело не JSON — оставляем код ошибки */
     }
-    throw new Error(message)
+    throw new ApiError(response.status, message)
   }
   return response.json() as Promise<T>
 }
 
 export const api = {
+  me: () => request<Me>('/api/auth/me'),
+  login: (password: string) =>
+    request<Me>('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  logout: () => fetch('/api/auth/logout', { method: 'POST' }),
   feed: (params: { minScore: number; source: string; view: FeedView }) => {
     const query = new URLSearchParams({ min_score: String(params.minScore), view: params.view })
     if (params.source) query.set('source', params.source)

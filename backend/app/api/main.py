@@ -1,22 +1,28 @@
-"""Web API for the UI. Run: uvicorn app.api.main:app --reload (from backend/)."""
+"""Web API for the UI. Run: uvicorn app.api.main:app --reload (from backend/).
+
+Every request works in a workspace: the owner's (valid session cookie) or the public demo sandbox.
+"""
 
 from collections import Counter
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.engine import Engine
-from sqlmodel import Session, func, select
+from sqlmodel import Session, create_engine, func, select
 
-from app.api.refresh import RefreshJob, Runner, default_runner
+from app.api.auth import COOKIE_NAME, SESSION_DAYS, Auth
+from app.api.refresh import RefreshJob, RefreshState, Runner, default_runner
 from app.collectors import COLLECTORS
-from app.config import PROJECT_ROOT
+from app.config import DATA_DIR, PROJECT_ROOT, get_settings
 from app.cover_letter import Tone, generate_cover_letter
 from app.db import get_engine, init_db
+from app.demo import DemoResetter
 from app.llm import LLM, PolzaLLM
 from app.models import STAGES, Application, Match, Vacancy, VacancyMark, utcnow
 from app.profile import PROFILE_PATH, RESUME_PATH, Profile, build_profile, read_resume, save_profile
@@ -104,6 +110,24 @@ class CoverLetterIn(BaseModel):
     wishes: str = ""
 
 
+class LoginIn(BaseModel):
+    password: str
+
+
+class Me(BaseModel):
+    role: Literal["owner", "demo"]
+    auth_enabled: bool
+    demo_available: bool
+
+
+@dataclass(frozen=True)
+class Workspace:
+    engine: Engine
+    profile_path: Path
+    resume_path: Path
+    demo: bool = False
+
+
 class RefreshIn(BaseModel):
     sources: list[str] = ["trudvsem", "exa"]
 
@@ -151,32 +175,98 @@ def create_app(
     serve_frontend: bool = True,
     llm_factory: Callable[[], LLM] = PolzaLLM,
     resume_path: Path = RESUME_PATH,
+    auth: Auth | None = None,
+    demo_engine: Engine | None = None,
+    demo_profile_path: Path | None = None,
+    demo_reset_hours: float = 0,
+    cookie_secure: bool = False,
 ) -> FastAPI:
     engine = engine or get_engine()
     init_db(engine)
     _migrate_saved_marks(engine)
+    auth = auth or Auth("", "")  # по умолчанию вход выключен: локально все — владелец
     app = FastAPI(title="Job Matcher API")
     app.state.refresh = RefreshJob(engine, profile_path, runner)
 
-    def session() -> Iterator[Session]:
-        with Session(engine) as s:
+    owner = Workspace(engine, profile_path, resume_path)
+    demo: Workspace | None = None
+    if auth.enabled and demo_engine is not None and demo_profile_path is not None:
+        demo = Workspace(demo_engine, demo_profile_path, DATA_DIR / "-no-demo-resume-", demo=True)
+        app.state.demo = DemoResetter(demo_engine, demo_profile_path, demo_reset_hours)
+
+    def workspace(request: Request) -> Workspace:
+        if auth.verify(request.cookies.get(COOKIE_NAME)):
+            return owner
+        if demo is not None:
+            return demo
+        raise HTTPException(401, "Нужно войти")
+
+    WsDep = Annotated[Workspace, Depends(workspace)]
+
+    def owner_only(ws: WsDep) -> Workspace:
+        if ws.demo:
+            raise HTTPException(403, "В демо-режиме это недоступно: функция вызывает платные API")
+        return ws
+
+    OwnerDep = Annotated[Workspace, Depends(owner_only)]
+
+    def session(ws: WsDep) -> Iterator[Session]:
+        with Session(ws.engine) as s:
             yield s
 
     SessionDep = Annotated[Session, Depends(session)]
 
-    def current_profile() -> Profile | None:
-        if not profile_path.exists():
+    def current_profile(ws: Workspace) -> Profile | None:
+        if not ws.profile_path.exists():
             return None
-        return Profile.model_validate_json(profile_path.read_text(encoding="utf-8"))
+        return Profile.model_validate_json(ws.profile_path.read_text(encoding="utf-8"))
+
+    @app.get("/api/health")
+    def health():
+        return {"status": "ok"}
+
+    @app.get("/api/auth/me", response_model=Me)
+    def me(ws: WsDep):
+        return Me(
+            role="demo" if ws.demo else "owner",
+            auth_enabled=auth.enabled,
+            demo_available=demo is not None,
+        )
+
+    @app.post("/api/auth/login", response_model=Me)
+    def login(body: LoginIn, request: Request, response: Response):
+        if not auth.enabled:
+            return Me(role="owner", auth_enabled=False, demo_available=False)
+        client = request.client.host if request.client else "?"
+        if auth.is_blocked(client):
+            raise HTTPException(429, "Слишком много попыток. Подождите 5 минут")
+        if not auth.check_password(body.password):
+            auth.record_failure(client)
+            raise HTTPException(401, "Неверный пароль")
+        auth.reset_failures(client)
+        response.set_cookie(
+            COOKIE_NAME,
+            auth.issue(),
+            max_age=SESSION_DAYS * 86400,
+            httponly=True,
+            secure=cookie_secure,
+            samesite="lax",
+        )
+        return Me(role="owner", auth_enabled=True, demo_available=demo is not None)
+
+    @app.post("/api/auth/logout", status_code=204)
+    def logout(response: Response):
+        response.delete_cookie(COOKIE_NAME)
 
     @app.get("/api/feed", response_model=Feed)
     def feed(
         s: SessionDep,
+        ws: WsDep,
         min_score: int = 0,
         source: str | None = None,
         view: Literal["all", "saved", "hidden"] = "all",
     ):
-        profile = current_profile()
+        profile = current_profile(ws)
         fingerprint = profile.fingerprint() if profile else None
         rows = s.exec(
             select(Vacancy, Match, VacancyMark, Application)
@@ -274,11 +364,11 @@ def create_app(
             s.commit()
 
     @app.post("/api/applications/{vacancy_id}/cover-letter", response_model=ApplicationOut)
-    def cover_letter(vacancy_id: str, body: CoverLetterIn, s: SessionDep):
+    def cover_letter(vacancy_id: str, body: CoverLetterIn, s: SessionDep, ws: OwnerDep):
         vacancy = s.get(Vacancy, vacancy_id)
         if vacancy is None:
             raise HTTPException(404, "Вакансия не найдена")
-        profile = current_profile()
+        profile = current_profile(ws)
         if profile is None:
             raise HTTPException(400, "Сначала создайте профиль")
         letter = generate_cover_letter(
@@ -288,7 +378,7 @@ def create_app(
             llm_factory(),
             tone=body.tone,
             wishes=body.wishes,
-            resume_path=resume_path,
+            resume_path=ws.resume_path,
         )
         application = s.get(Application, vacancy_id) or Application(vacancy_id=vacancy_id)
         application.cover_letter = letter.letter
@@ -300,38 +390,40 @@ def create_app(
         return application
 
     @app.get("/api/profile", response_model=Profile)
-    def get_profile():
-        profile = current_profile()
+    def get_profile(ws: WsDep):
+        profile = current_profile(ws)
         if profile is None:
             raise HTTPException(404, "Профиль ещё не создан")
         return profile
 
     @app.put("/api/profile", response_model=Profile)
-    def put_profile(profile: Profile):
-        save_profile(profile, profile_path)
+    def put_profile(profile: Profile, ws: OwnerDep):  # в демо смена профиля сломала бы ленту
+        save_profile(profile, ws.profile_path)
         return profile
 
     @app.post("/api/profile/rebuild", response_model=Profile)
-    def rebuild_profile():
-        if not resume_path.exists():
+    def rebuild_profile(ws: OwnerDep):
+        if not ws.resume_path.exists():
             raise HTTPException(400, "Положите резюме в data/resume.pdf")
-        old = current_profile()
-        profile = build_profile(read_resume(resume_path), llm_factory())
+        old = current_profile(ws)
+        profile = build_profile(read_resume(ws.resume_path), llm_factory())
         if old:
             profile.preferences = old.preferences  # ручные настройки не теряем
-        save_profile(profile, profile_path)
+        save_profile(profile, ws.profile_path)
         return profile
 
     @app.get("/api/refresh")
-    def refresh_status(request: Request):
+    def refresh_status(request: Request, ws: WsDep):
+        if ws.demo:
+            return RefreshState().to_dict()  # журнал владельца гостям не показываем
         return request.app.state.refresh.state.to_dict()
 
     @app.post("/api/refresh", status_code=202)
-    def refresh(body: RefreshIn, request: Request):
+    def refresh(body: RefreshIn, request: Request, ws: OwnerDep):
         unknown = set(body.sources) - set(COLLECTORS)
         if unknown:  # пустой список допустим — только пересчитать оценки, без сбора
             raise HTTPException(400, f"Неизвестные источники: {', '.join(unknown)}")
-        if current_profile() is None:
+        if current_profile(ws) is None:
             raise HTTPException(400, "Сначала создайте профиль")
         if not request.app.state.refresh.start(body.sources):
             raise HTTPException(409, "Обновление уже идёт")
@@ -344,4 +436,23 @@ def create_app(
     return app
 
 
-app = create_app()
+def create_app_from_settings() -> FastAPI:
+    """Production wiring from .env: password login and the public demo sandbox."""
+    settings = get_settings()
+    auth = Auth(settings.app_password, settings.session_secret)
+    demo_engine = None
+    if auth.enabled and settings.demo_enabled:
+        demo_engine = create_engine(
+            f"sqlite:///{(DATA_DIR / 'demo.db').as_posix()}",
+            connect_args={"check_same_thread": False},
+        )
+    return create_app(
+        auth=auth,
+        demo_engine=demo_engine,
+        demo_profile_path=DATA_DIR / "demo_profile.json",
+        demo_reset_hours=settings.demo_reset_hours,
+        cookie_secure=settings.cookie_secure,
+    )
+
+
+app = create_app_from_settings()
