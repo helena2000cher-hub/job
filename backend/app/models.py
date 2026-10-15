@@ -1,3 +1,4 @@
+import hashlib
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -49,3 +50,30 @@ class Vacancy(SQLModel, table=True):
         """All descriptive text in one string — input for remote detection and matching."""
         parts = [self.title, self.requirements, self.duties, self.conditions, " ".join(self.skills)]
         return "\n".join(p for p in parts if p)
+
+    def content_hash(self) -> str:
+        """Changes when the vacancy text changes — cached embeddings and scores are then redone."""
+        return hashlib.sha256(self.text.encode()).hexdigest()[:16]
+
+
+class VacancyEmbedding(SQLModel, table=True):
+    vacancy_id: str = Field(primary_key=True, foreign_key="vacancy.id")
+    model: str
+    content_hash: str
+    vector: list[float] = Field(sa_column=Column(JSON))
+
+
+class Match(SQLModel, table=True):
+    """LLM assessment of how well a vacancy fits the candidate profile."""
+
+    vacancy_id: str = Field(primary_key=True, foreign_key="vacancy.id")
+    profile_fingerprint: str
+    content_hash: str
+    score: int = Field(index=True)
+    similarity: float
+    matched_skills: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    missing_skills: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    red_flags: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    verdict: str = ""
+    model: str = ""
+    created_at: datetime = Field(default_factory=utcnow)
