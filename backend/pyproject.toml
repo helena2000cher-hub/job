@@ -9,6 +9,8 @@ dependencies = [
     "pydantic-settings>=2.4",
     "openai>=1.50",
     "pypdf>=5.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
 ]
 
 [project.optional-dependencies]

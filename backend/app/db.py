@@ -11,9 +11,12 @@ from app.config import get_settings
 @lru_cache
 def get_engine(url: str | None = None) -> Engine:
     url = url or get_settings().database_url
+    connect_args = {}
     if url.startswith("sqlite:///"):
         Path(url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
-    return create_engine(url)
+        # веб-сервер и фоновое обновление работают с базой из разных потоков
+        connect_args["check_same_thread"] = False
+    return create_engine(url, connect_args=connect_args)
 
 
 def init_db(engine: Engine | None = None) -> None:

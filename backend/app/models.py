@@ -63,6 +63,14 @@ class VacancyEmbedding(SQLModel, table=True):
     vector: list[float] = Field(sa_column=Column(JSON))
 
 
+class VacancyMark(SQLModel, table=True):
+    """User's own decision about a vacancy: saved for later or hidden from the feed."""
+
+    vacancy_id: str = Field(primary_key=True, foreign_key="vacancy.id")
+    status: str  # "saved" | "hidden"
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
 class Match(SQLModel, table=True):
     """LLM assessment of how well a vacancy fits the candidate profile."""
 

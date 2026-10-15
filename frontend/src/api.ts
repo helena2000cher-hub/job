@@ -1,0 +1,118 @@
+// Типы и вызовы backend API (FastAPI, backend/app/api/main.py)
+
+export type Mark = 'saved' | 'hidden' | null
+
+export interface FeedItem {
+  id: string
+  title: string
+  company: string | null
+  region: string | null
+  salary_from: number | null
+  salary_to: number | null
+  currency: string
+  is_remote: boolean
+  source: string
+  url: string
+  published_at: string | null
+  score: number | null
+  similarity: number | null
+  verdict: string
+  matched_skills: string[]
+  missing_skills: string[]
+  red_flags: string[]
+  mark: Mark
+}
+
+export interface VacancyDetail extends FeedItem {
+  employment: string | null
+  schedule: string | null
+  experience_years: number | null
+  education: string | null
+  requirements: string | null
+  duties: string | null
+  conditions: string | null
+  skills: string[]
+  fetched_at: string
+}
+
+export interface Feed {
+  items: FeedItem[]
+  total_vacancies: number
+  scored: number
+  sources: Record<string, number>
+  profile_ready: boolean
+  last_fetched_at: string | null
+}
+
+export interface Preferences {
+  remote_only: boolean
+  regions: string[]
+  salary_min: number | null
+  employment_types: string[]
+  stop_words: string[]
+}
+
+export interface Profile {
+  headline: string
+  target_roles: string[]
+  skills: string[]
+  experience_years: number | null
+  seniority: string | null
+  industries: string[]
+  education: string | null
+  summary: string
+  search_queries: string[]
+  preferences: Preferences
+}
+
+export interface RefreshState {
+  running: boolean
+  started_at: string | null
+  finished_at: string | null
+  log: string[]
+  error: string | null
+  new_vacancies: number
+  scored: number
+  cost_dollars: number
+}
+
+export type FeedView = 'all' | 'saved' | 'hidden'
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...init?.headers },
+  })
+  if (!response.ok) {
+    let message = `Ошибка ${response.status}`
+    try {
+      const body = await response.json()
+      if (typeof body.detail === 'string') message = body.detail
+    } catch {
+      /* тело не JSON — оставляем код ошибки */
+    }
+    throw new Error(message)
+  }
+  return response.json() as Promise<T>
+}
+
+export const api = {
+  feed: (params: { minScore: number; source: string; view: FeedView }) => {
+    const query = new URLSearchParams({ min_score: String(params.minScore), view: params.view })
+    if (params.source) query.set('source', params.source)
+    return request<Feed>(`/api/feed?${query}`)
+  },
+  vacancy: (id: string) => request<VacancyDetail>(`/api/vacancies/${encodeURIComponent(id)}`),
+  mark: (id: string, status: Mark) =>
+    request(`/api/vacancies/${encodeURIComponent(id)}/mark`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+  profile: () => request<Profile>('/api/profile'),
+  saveProfile: (profile: Profile) =>
+    request<Profile>('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }),
+  rebuildProfile: () => request<Profile>('/api/profile/rebuild', { method: 'POST' }),
+  refreshStatus: () => request<RefreshState>('/api/refresh'),
+  refresh: (sources: string[]) =>
+    request<RefreshState>('/api/refresh', { method: 'POST', body: JSON.stringify({ sources }) }),
+}

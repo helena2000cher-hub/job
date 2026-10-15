@@ -10,19 +10,11 @@ import argparse
 import logging
 import sys
 
-import httpx
-from sqlmodel import Session
-
-from app.collectors import COLLECTORS, ExaCollector, SearchQuery
-from app.collectors.base import Collector
+from app.collecting import collect
+from app.collectors import COLLECTORS
 from app.collectors.exa import SITES
 from app.config import get_settings
-from app.db import get_engine, init_db
-from app.models import Vacancy
 from app.profile import load_profile
-from app.storage import save_vacancies
-
-log = logging.getLogger(__name__)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -58,41 +50,28 @@ def main(argv: list[str] | None = None) -> int:
     if not queries:
         parser.error("нужен --query или --from-profile")
 
-    collector: Collector = (
-        ExaCollector(args.sites) if args.source == "exa" else COLLECTORS[args.source]()
-    )
     # Удалёнка ищется по всей стране, офис — в своём регионе.
     region = None if args.all_regions or remote_only else args.region
-
-    vacancies: dict[str, Vacancy] = {}
-    for text in queries:
-        query = SearchQuery(
-            text=text, region_code=region, remote_only=remote_only, limit=args.limit
-        )
-        try:
-            found = list(collector.fetch(query))
-        except httpx.HTTPError as exc:  # один упавший запрос не должен терять результаты остальных
-            log.warning("%s: запрос «%s» не выполнен: %s", args.source, text, exc)
-            continue
-        new = sum(v.id not in vacancies for v in found)
-        vacancies.update((v.id, v) for v in found)
-        print(f"  «{text}»: {len(found)} (новых в этом прогоне: {new})")
-
-    engine = get_engine()
-    init_db(engine)
-    # expire_on_commit=False — чтобы печатать сводку по объектам уже после сохранения
-    with Session(engine, expire_on_commit=False) as session:
-        stats = save_vacancies(session, vacancies.values())
+    result = collect(
+        args.source,
+        queries,
+        remote_only=remote_only,
+        region_code=region,
+        limit=args.limit,
+        sites=args.sites,
+        on_progress=lambda msg: print(f"  {msg}"),
+    )
+    vacancies = {v.id: v for v in result.vacancies}
 
     remote = sum(v.is_remote for v in vacancies.values())
     print(
         f"{args.source}: найдено {len(vacancies)} (удалённых: {remote}), "
-        f"новых в базе {stats.created}, обновлено {stats.updated}"
+        f"новых в базе {result.created}, обновлено {result.updated}"
     )
-    if isinstance(collector, ExaCollector):
+    if args.source == "exa":
         print(
-            f"  отброшено (списки, статьи, закрытые, не удалённые): {collector.skipped}; "
-            f"стоимость Exa: ${collector.cost_dollars:.3f}"
+            f"  отброшено (списки, статьи, закрытые, не удалённые): {result.skipped}; "
+            f"стоимость Exa: ${result.cost_dollars:.3f}"
         )
     for v in list(vacancies.values())[:10]:
         salary = _format_salary(v.salary_from, v.salary_to)

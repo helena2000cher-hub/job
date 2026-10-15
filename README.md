@@ -15,54 +15,75 @@
 - [x] Профиль из резюме (LLM через polza.ai), контакты вычищаются перед отправкой в модель
 - [x] Подбор: жёсткие фильтры → смысловая близость (эмбеддинги) → оценка LLM 0–100 с объяснением
 - [x] Кэш эмбеддингов и оценок: повторный запуск не тратит деньги, пока не изменились профиль или вакансия
-- [ ] Веб-интерфейс: лента, карточка вакансии, трекер откликов
+- [x] Веб-интерфейс: лента с фильтрами, карточка вакансии с разбором, редактор профиля,
+  «Обновить» с выбором источников и прогрессом, сохранить/скрыть, тёмная тема, мобильная вёрстка
+- [ ] Трекер откликов и сопроводительные письма
 - [ ] Больше источников: Telegram-каналы, SuperJob
 
 ## Стек
 
-Python 3.12 · SQLModel/SQLite · httpx · OpenAI SDK (polza.ai: Claude, bge-m3) · pypdf · pytest · ruff.
-Дальше: FastAPI + React + Vite + Tailwind.
+**Backend:** Python 3.12 · FastAPI · SQLModel/SQLite · httpx · OpenAI SDK (polza.ai: Claude, bge-m3) · Exa · pypdf · pytest · ruff
+**Frontend:** React 19 · TypeScript · Vite · Tailwind CSS 4 · lucide-react
 
 ## Быстрый старт
 
 ```bash
+# backend
 cd backend
 py -m venv .venv
 .venv\Scripts\activate          # Windows; на Linux/macOS: source .venv/bin/activate
 pip install -e ".[dev]"
-copy ..\.env.example ..\.env     # и заполнить ключи
+copy ..\.env.example ..\.env     # и заполнить ключи POLZA_API_KEY, EXA_API_KEY
 
-# собрать вакансии аналитика в Пермском крае
-python -m app.collect --query "аналитик"
-
-# только удалённые, по всей России
-python -m app.collect --query "аналитик" --all-regions --remote-only
-
-# hh.ru, Хабр Карьера, сайты компаний — по запросам из профиля (~$0.5 за прогон)
-python -m app.collect --source exa --from-profile --limit 30
-
-# профиль из резюме: data/resume.pdf → data/profile.json (можно править руками)
+# профиль из резюме: data/resume.pdf → data/profile.json
 python -m app.profile
 
-# подобрать вакансии: топ-30 по смыслу оценивает LLM
-python -m app.match --min-score 60
+# веб-интерфейс: API на :8000
+uvicorn app.api.main:app --reload
 
+# во втором терминале — фронтенд на :5173 (запросы /api проксируются на :8000)
+cd frontend
+npm install
+npm run dev
+```
+
+Откройте http://localhost:5173, затем «Обновить» → выбрать источники → «Начать».
+
+Для продакшена `npm run build` собирает фронтенд в `frontend/dist`, и FastAPI отдаёт его сам:
+весь сервис работает как один процесс на :8000.
+
+### Командная строка
+
+```bash
+python -m app.collect --query "аналитик"                              # Работа России, Пермский край
+python -m app.collect --query "аналитик" --all-regions --remote-only  # удалёнка по всей России
+python -m app.collect --source exa --from-profile --limit 30          # hh.ru, Хабр, сайты компаний (~$0.5)
+python -m app.match --min-score 60                                    # подбор с объяснениями
 pytest
 ```
+
+## Как устроен подбор
+
+1. **Фильтры:** формат работы, потолок зарплаты ниже минимума, стоп-слова («склад», «курьер»…).
+2. **Дубли:** одна вакансия в разных регионах оценивается один раз.
+3. **Смысловая близость:** эмбеддинги профиля и вакансий (`baai/bge-m3`), в LLM уходит только топ.
+4. **Оценка LLM:** балл 0–100, совпавшие и недостающие навыки, «красные флаги», вердикт.
 
 ## Структура
 
 ```
 backend/app/
+  api/          # FastAPI: лента, карточка, профиль, фоновое «Обновить»
   collectors/   # источники вакансий: trudvsem, exa (hh.ru, Хабр, сайты компаний)
   matching/     # фильтры, эмбеддинги, LLM-оценка, конвейер
+  collecting.py # сбор по списку запросов (общий для CLI и API)
   llm.py        # клиент polza.ai (чат + эмбеддинги)
   profile.py    # профиль кандидата из резюме
-  models.py     # Vacancy, VacancyEmbedding, Match
-  storage.py    # сохранение с обновлением дублей
-  collect.py    # CLI: сбор вакансий
-  match.py      # CLI: подбор и вывод с объяснениями
-data/           # локальная БД и резюме — не попадают в git
+  models.py     # Vacancy, VacancyEmbedding, Match, VacancyMark
+frontend/src/
+  components/   # лента, карточка, профиль, кнопка «Обновить»
+  api.ts        # типизированный клиент API
+data/           # локальная БД, резюме и профиль — не попадают в git
 ```
 
 ## Приватность
