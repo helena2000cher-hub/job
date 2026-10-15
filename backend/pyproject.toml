@@ -28,6 +28,7 @@ include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # `from tests.conftest import …` работает и при запуске просто `pytest`
 
 [tool.ruff]
 line-length = 100
