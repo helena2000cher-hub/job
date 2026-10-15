@@ -1,0 +1,33 @@
+[project]
+name = "job-matcher"
+version = "0.1.0"
+description = "Personal job search: collects vacancies and matches them to a candidate profile"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27",
+    "sqlmodel>=0.0.22",
+    "pydantic-settings>=2.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.7",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

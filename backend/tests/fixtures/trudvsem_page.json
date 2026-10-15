@@ -1,0 +1,56 @@
+{
+  "status": "200",
+  "request": {"api": "v1"},
+  "meta": {"total": 3, "limit": 100},
+  "results": {
+    "vacancies": [
+      {
+        "vacancy": {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "source": "Вакансия работодателя",
+          "region": {"region_code": "5900000000000", "name": "Пермский край"},
+          "company": {"name": "ООО \"Пример\"", "inn": "0000000000"},
+          "creation-date": "2026-03-06",
+          "date_modify": "2026-10-08T13:15:26+0300",
+          "salary": "от 35000",
+          "salary_min": 35000,
+          "salary_max": 35000,
+          "job-name": "Ведущий аналитик ",
+          "vac_url": "https://trudvsem.ru/vacancy/card/0/00000000-0000-0000-0000-000000000001",
+          "employment": "Полная занятость",
+          "schedule": "Полный рабочий день",
+          "requirements": "Высшее образование; уверенный <b>MS Excel</b>, 1С",
+          "duty": "Подготовка аналитических отчётов",
+          "category": {"specialisation": "Транспорт, логистика"},
+          "requirement": {"education": "Высшее", "experience": 3},
+          "addresses": {"address": [{"location": "г Пермь, ул. Примерная, 1"}]},
+          "skills": []
+        }
+      },
+      {
+        "vacancy": {
+          "id": "00000000-0000-0000-0000-000000000002",
+          "region": {"name": "Пермский край"},
+          "company": {"name": "АО \"Связь\""},
+          "creation-date": "2026-09-01",
+          "salary": "от 40000 до 60000",
+          "salary_min": 40000,
+          "salary_max": 60000,
+          "job-name": "Специалист второй линии поддержки",
+          "vac_url": "https://trudvsem.ru/vacancy/card/0/00000000-0000-0000-0000-000000000002",
+          "employment": "Дистанционная (удаленная) работа",
+          "schedule": "Сменная работа",
+          "requirements": "Грамотная речь",
+          "duty": "Консультирование клиентов",
+          "skills": ["CRM", {"name": "Деловая переписка"}]
+        }
+      },
+      {
+        "vacancy": {
+          "id": "00000000-0000-0000-0000-000000000003",
+          "job-name": "Без ссылки — битая запись"
+        }
+      }
+    ]
+  }
+}
