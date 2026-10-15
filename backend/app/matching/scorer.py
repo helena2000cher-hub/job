@@ -26,7 +26,7 @@ SYSTEM_PROMPT = """Ты — карьерный консультант. Оцен�
 
 def vacancy_card(v: Vacancy) -> str:
     salary = (
-        f"{v.salary_from or '?'}–{v.salary_to or '?'} ₽"
+        f"{v.salary_from or '?'}–{v.salary_to or '?'} {v.currency}"
         if v.salary_from or v.salary_to
         else "не указана"
     )

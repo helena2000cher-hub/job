@@ -124,3 +124,9 @@ def test_pipeline_scores_duplicates_once(session, profile):
     assert report.duplicates == 1
     assert report.scored == 2
     assert len(llm.chat_calls) == 2
+
+
+def test_salary_filter_ignores_foreign_currency():
+    prefs = Preferences(remote_only=True, salary_min=100_000)
+    tenge = make_vacancy(1, "Аналитик", salary_to=90_000, currency="KZT")
+    assert reject_reason(tenge, prefs) is None

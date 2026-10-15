@@ -13,7 +13,12 @@ def reject_reason(vacancy: Vacancy, prefs: Preferences) -> str | None:
             return f"регион: {vacancy.region}"
 
     # Отсекаем, только если потолок известен и ниже минимума. «от X» и «не указана» оценит LLM.
-    if prefs.salary_min and vacancy.salary_to is not None and vacancy.salary_to < prefs.salary_min:
+    if (
+        prefs.salary_min
+        and vacancy.currency == "RUB"
+        and vacancy.salary_to is not None
+        and vacancy.salary_to < prefs.salary_min
+    ):
         return f"зарплата: до {vacancy.salary_to}"
 
     haystack = f"{vacancy.title}\n{vacancy.duties or ''}".lower()
