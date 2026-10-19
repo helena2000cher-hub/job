@@ -160,7 +160,7 @@ export function CoverLetter({ vacancyId, application, onChange }: Props) {
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Сопроводительное письмо</h3>
         {!letter && !isDemo && (
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Нейросеть напишет письмо под эту вакансию по вашему резюме: сильные стороны и честно о пробелах.
+            Нейросеть напишет письмо под эту вакансию по вашему резюме — с акцентом на сильные стороны, чтобы пригласили на собеседование.
           </p>
         )}
       </div>
