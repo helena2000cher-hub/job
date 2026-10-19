@@ -5,6 +5,8 @@ import { api } from '../api'
 import type { Application, Mark, VacancyDetail } from '../api'
 import { formatDate, formatSalary, sourceLabel } from '../format'
 import { ApplicationPanel, CoverLetter } from './ApplicationPanel'
+import { AppliedPrompt } from './AppliedPrompt'
+import { shouldAskApplied } from '../stages'
 import { buttonClass } from './styles'
 import { Button, Chip, ScoreBadge, Spinner } from './ui'
 
@@ -18,6 +20,7 @@ interface Props {
 export function VacancyDrawer({ id, onClose, onMark, onApplicationChange }: Props) {
   const [vacancy, setVacancy] = useState<VacancyDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [askApplied, setAskApplied] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -90,13 +93,29 @@ export function VacancyDrawer({ id, onClose, onMark, onApplicationChange }: Prop
             </header>
 
             <div className="flex flex-wrap gap-2">
-              <a href={vacancy.url} target="_blank" rel="noreferrer" className={buttonClass('primary')}>
+              <a
+                href={vacancy.url}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonClass('primary')}
+                onClick={() => shouldAskApplied(vacancy.stage) && setAskApplied(true)}
+              >
                 Открыть вакансию на сайте <ExternalLink className="h-4 w-4" />
               </a>
               <Button variant="ghost" onClick={() => mark(vacancy.mark === 'hidden' ? null : 'hidden')}>
                 {vacancy.mark === 'hidden' ? 'Вернуть в ленту' : 'Скрыть'}
               </Button>
             </div>
+
+            {askApplied && (
+              <AppliedPrompt
+                vacancyId={vacancy.id}
+                onAnswered={(application) => {
+                  if (application) changeApplication(application)
+                  setAskApplied(false)
+                }}
+              />
+            )}
 
             {vacancy.score !== null && (
               <section className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">

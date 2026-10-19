@@ -72,7 +72,12 @@ class VacancyMark(SQLModel, table=True):
 
 
 # Колонки трекера откликов, в порядке движения по воронке
-STAGES = ("interesting", "applied", "interview", "offer", "rejected")
+STAGES = ("interesting", "applied", "no_response", "interview", "offer", "rejected")
+# Этапы, на которых отклик уже отправлен
+SENT_STAGES = ("applied", "no_response", "interview", "offer", "rejected")
+# Этапы, где работодатель ответил приглашением
+POSITIVE_STAGES = ("interview", "offer")
+NO_RESPONSE_DAYS = 10
 
 
 class Application(SQLModel, table=True):
@@ -85,8 +90,10 @@ class Application(SQLModel, table=True):
     applied_at: date | None = None
     cover_letter: str = ""
     cover_letter_subject: str = ""
+    cover_letter_tone: str = ""  # тон последнего сгенерированного письма — для аналитики
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
+    stage_changed_at: datetime | None = None
 
 
 class Match(SQLModel, table=True):

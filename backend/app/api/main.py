@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, create_engine, func, select
 
+from app.advice import Advice, generate_advice, load_advice, save_advice
 from app.api.auth import COOKIE_NAME, SESSION_DAYS, Auth
 from app.api.refresh import RefreshJob, RefreshState, Runner, default_runner
 from app.collectors import COLLECTORS
@@ -26,6 +27,7 @@ from app.demo import DemoResetter
 from app.llm import LLM, PolzaLLM
 from app.models import STAGES, Application, Match, Vacancy, VacancyMark, utcnow
 from app.profile import PROFILE_PATH, RESUME_PATH, Profile, build_profile, read_resume, save_profile
+from app.tracker import compute_analytics, mark_no_response
 
 FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 
@@ -59,7 +61,9 @@ class ApplicationOut(BaseModel):
     applied_at: date | None
     cover_letter: str
     cover_letter_subject: str
+    cover_letter_tone: str | None = None
     updated_at: datetime
+    stage_changed_at: datetime | None = None
 
 
 class TrackerItem(FeedItem):
@@ -92,7 +96,7 @@ class MarkIn(BaseModel):
     status: Literal["saved", "hidden"] | None
 
 
-Stage = Literal["interesting", "applied", "interview", "offer", "rejected"]
+Stage = Literal["interesting", "applied", "no_response", "interview", "offer", "rejected"]
 assert set(Stage.__args__) == set(STAGES)
 
 
@@ -331,6 +335,7 @@ def create_app(
 
     @app.get("/api/applications", response_model=list[TrackerItem])
     def applications(s: SessionDep):
+        mark_no_response(s)
         rows = s.exec(
             select(Vacancy, Application, Match)
             .join(Application, Application.vacancy_id == Vacancy.id)
@@ -344,10 +349,14 @@ def create_app(
     def update_application(vacancy_id: str, body: ApplicationIn, s: SessionDep):
         if s.get(Vacancy, vacancy_id) is None:
             raise HTTPException(404, "Вакансия не найдена")
-        application = s.get(Application, vacancy_id) or Application(vacancy_id=vacancy_id)
+        existing = s.get(Application, vacancy_id)
+        application = existing or Application(vacancy_id=vacancy_id)
+        old_stage = existing.stage if existing else None
         for field, value in body.model_dump(exclude_unset=True).items():
             if value is not None or field == "applied_at":
                 setattr(application, field, value)
+        if body.stage is not None and body.stage != old_stage:
+            application.stage_changed_at = utcnow()
         if application.stage == "applied" and application.applied_at is None:
             application.applied_at = date.today()  # дата отклика проставляется сама
         application.updated_at = utcnow()
@@ -383,6 +392,7 @@ def create_app(
         application = s.get(Application, vacancy_id) or Application(vacancy_id=vacancy_id)
         application.cover_letter = letter.letter
         application.cover_letter_subject = letter.subject
+        application.cover_letter_tone = body.tone
         application.updated_at = utcnow()
         s.add(application)
         s.commit()
@@ -411,6 +421,29 @@ def create_app(
             profile.preferences, profile.extra = old.preferences, old.extra  # ручное не теряем
         save_profile(profile, ws.profile_path)
         return profile
+
+    def advice_path(ws: Workspace) -> Path:
+        return ws.profile_path.parent / ("demo_advice.json" if ws.demo else "advice.json")
+
+    @app.get("/api/analytics")
+    def analytics(s: SessionDep, ws: WsDep):
+        mark_no_response(s)
+        profile = current_profile(ws)
+        stats = compute_analytics(s, profile.fingerprint() if profile else None)
+        advice = load_advice(advice_path(ws))
+        return {**stats, "advice": advice.model_dump(mode="json") if advice else None}
+
+    @app.post("/api/analytics/advice", response_model=Advice)
+    def make_advice(s: SessionDep, ws: OwnerDep):
+        profile = current_profile(ws)
+        if profile is None:
+            raise HTTPException(400, "Сначала создайте профиль")
+        mark_no_response(s)
+        advice = generate_advice(
+            profile, compute_analytics(s, profile.fingerprint()), llm_factory()
+        )
+        save_advice(advice, advice_path(ws))
+        return advice
 
     @app.get("/api/refresh")
     def refresh_status(request: Request, ws: WsDep):

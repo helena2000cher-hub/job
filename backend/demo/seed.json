@@ -2,104 +2,326 @@
   "_comment": "Демо-данные для публичного режима. Все люди, компании и вакансии вымышлены, ссылки ведут на example.com.",
   "profile": {
     "headline": "Продуктовый / бизнес-аналитик (SQL, Python, BPMN)",
-    "target_roles": ["Продуктовый аналитик", "Бизнес-аналитик", "Системный аналитик", "Аналитик данных"],
-    "skills": ["SQL", "Python", "pandas", "BPMN", "User Stories", "ТЗ/SRS", "Jira", "Confluence", "A/B-тесты", "Продуктовые метрики", "Power BI", "REST API", "Postman", "Excel", "Сбор требований", "Анализ требований", "Figma (прототипы)", "Git"],
+    "target_roles": [
+      "Продуктовый аналитик",
+      "Бизнес-аналитик",
+      "Системный аналитик",
+      "Аналитик данных"
+    ],
+    "skills": [
+      "SQL",
+      "Python",
+      "pandas",
+      "BPMN",
+      "User Stories",
+      "ТЗ/SRS",
+      "Jira",
+      "Confluence",
+      "A/B-тесты",
+      "Продуктовые метрики",
+      "Power BI",
+      "REST API",
+      "Postman",
+      "Excel",
+      "Сбор требований",
+      "Анализ требований",
+      "Figma (прототипы)",
+      "Git"
+    ],
     "experience_years": 5,
     "seniority": "middle",
-    "industries": ["Финтех", "E-commerce", "IT-аутсорсинг"],
+    "industries": [
+      "Финтех",
+      "E-commerce",
+      "IT-аутсорсинг"
+    ],
     "education": "Высшее, экономика",
     "summary": "Аналитик с опытом в финтехе и e-commerce: собираю требования, считаю продуктовые метрики и довожу задачи до релиза вместе с разработкой. Уверенно работаю с SQL и Python для анализа данных.",
-    "search_queries": ["продуктовый аналитик", "бизнес-аналитик", "системный аналитик", "аналитик данных"],
+    "search_queries": [
+      "продуктовый аналитик",
+      "бизнес-аналитик",
+      "системный аналитик",
+      "аналитик данных"
+    ],
     "preferences": {
       "remote_only": true,
       "regions": [],
       "salary_min": 150000,
-      "employment_types": ["полная занятость"],
-      "stop_words": ["склад", "курьер", "холодные звонки"]
+      "employment_types": [
+        "полная занятость"
+      ],
+      "stop_words": [
+        "склад",
+        "курьер",
+        "холодные звонки"
+      ]
     }
   },
   "vacancies": [
     {
-      "id": "demo:1", "source": "hh.ru", "title": "Продуктовый аналитик в финтех-приложение",
-      "company": "ФинПоток (демо)", "salary_from": 200000, "salary_to": 260000,
+      "id": "demo:1",
+      "source": "hh.ru",
+      "title": "Продуктовый аналитик в финтех-приложение",
+      "company": "ФинПоток (демо)",
+      "salary_from": 200000,
+      "salary_to": 260000,
       "requirements": "SQL на уровне оконных функций; Python (pandas); опыт A/B-тестирования; продуктовые метрики (retention, LTV, конверсии).",
       "duties": "Анализировать воронки и поведение пользователей, планировать и считать A/B-тесты, строить дашборды, формулировать гипотезы вместе с продакт-менеджером.",
       "conditions": "Полностью удалённо, гибкий график, ДМС, обучение за счёт компании.",
-      "skills": ["SQL", "Python", "A/B-тесты", "Amplitude"],
-      "match": {"score": 91, "verdict": "Почти идеальное совпадение: финтех-опыт, SQL, Python и A/B-тесты закрывают ядро вакансии, зарплата выше ожиданий.",
-        "matched": ["SQL", "Python", "A/B-тесты", "Продуктовые метрики"], "missing": ["Amplitude"], "red_flags": []}
+      "skills": [
+        "SQL",
+        "Python",
+        "A/B-тесты",
+        "Amplitude"
+      ],
+      "match": {
+        "score": 91,
+        "verdict": "Почти идеальное совпадение: финтех-опыт, SQL, Python и A/B-тесты закрывают ядро вакансии, зарплата выше ожиданий.",
+        "matched": [
+          "SQL",
+          "Python",
+          "A/B-тесты",
+          "Продуктовые метрики"
+        ],
+        "missing": [
+          "Amplitude"
+        ],
+        "red_flags": []
+      }
     },
     {
-      "id": "demo:2", "source": "career.habr.com", "title": "Бизнес-аналитик (платформа онлайн-заказов)",
-      "company": "Ритейл Плюс (демо)", "salary_from": 180000, "salary_to": 220000,
+      "id": "demo:2",
+      "source": "career.habr.com",
+      "title": "Бизнес-аналитик (платформа онлайн-заказов)",
+      "company": "Ритейл Плюс (демо)",
+      "salary_from": 180000,
+      "salary_to": 220000,
       "requirements": "Опыт бизнес-анализа от 3 лет; BPMN; User Stories; работа с REST API; Jira/Confluence.",
       "duties": "Собирать и формализовать требования, описывать процессы AS IS / TO BE, готовить постановки для разработки, принимать результат.",
       "conditions": "Удалённо, официальное оформление, компенсация техники.",
-      "skills": ["BPMN", "User Stories", "REST API", "Jira"],
-      "match": {"score": 86, "verdict": "Сильное совпадение по бизнес-анализу и e-commerce, все ключевые инструменты знакомы.",
-        "matched": ["BPMN", "User Stories", "REST API", "Jira", "Confluence"], "missing": ["Опыт с маркетплейсами"], "red_flags": []}
+      "skills": [
+        "BPMN",
+        "User Stories",
+        "REST API",
+        "Jira"
+      ],
+      "match": {
+        "score": 86,
+        "verdict": "Сильное совпадение по бизнес-анализу и e-commerce, все ключевые инструменты знакомы.",
+        "matched": [
+          "BPMN",
+          "User Stories",
+          "REST API",
+          "Jira",
+          "Confluence"
+        ],
+        "missing": [
+          "Опыт с маркетплейсами"
+        ],
+        "red_flags": []
+      }
     },
     {
-      "id": "demo:3", "source": "hh.ru", "title": "Системный аналитик (интеграции)",
-      "company": "Облачные решения (демо)", "salary_from": 170000, "salary_to": null,
+      "id": "demo:3",
+      "source": "hh.ru",
+      "title": "Системный аналитик (интеграции)",
+      "company": "Облачные решения (демо)",
+      "salary_from": 170000,
+      "salary_to": null,
       "requirements": "Проектирование интеграций REST/SOAP, UML (sequence), SQL, понимание брокеров сообщений (Kafka).",
       "duties": "Проектировать интеграции между сервисами, писать спецификации API, согласовывать решения с архитекторами.",
       "conditions": "Удалённо по РФ.",
-      "skills": ["REST API", "UML", "SQL", "Kafka"],
-      "match": {"score": 74, "verdict": "Хорошо подходит по API и SQL, но потребуется подтянуть UML и брокеры сообщений.",
-        "matched": ["REST API", "SQL", "Postman"], "missing": ["UML", "Kafka", "SOAP"], "red_flags": ["Верхняя граница зарплаты не указана"]}
+      "skills": [
+        "REST API",
+        "UML",
+        "SQL",
+        "Kafka"
+      ],
+      "match": {
+        "score": 74,
+        "verdict": "Хорошо подходит по API и SQL, но потребуется подтянуть UML и брокеры сообщений.",
+        "matched": [
+          "REST API",
+          "SQL",
+          "Postman"
+        ],
+        "missing": [
+          "UML",
+          "Kafka",
+          "SOAP"
+        ],
+        "red_flags": [
+          "Верхняя граница зарплаты не указана"
+        ]
+      }
     },
     {
-      "id": "demo:4", "source": "trudvsem", "title": "Аналитик данных",
-      "company": "МедСофт (демо)", "salary_from": 150000, "salary_to": 180000,
+      "id": "demo:4",
+      "source": "trudvsem",
+      "title": "Аналитик данных",
+      "company": "МедСофт (демо)",
+      "salary_from": 150000,
+      "salary_to": 180000,
       "requirements": "Python, SQL, визуализация (Power BI или аналог), статистика.",
       "duties": "Готовить регулярную отчётность, искать аномалии в данных, автоматизировать выгрузки.",
       "conditions": "Удалённо, 5/2.",
-      "skills": ["Python", "SQL", "Power BI"],
-      "match": {"score": 71, "verdict": "Навыки совпадают, но роль больше про отчётность, чем про продукт.",
-        "matched": ["Python", "SQL", "Power BI"], "missing": ["Статистические тесты"], "red_flags": ["Зарплата на нижней границе ожиданий"]}
+      "skills": [
+        "Python",
+        "SQL",
+        "Power BI"
+      ],
+      "match": {
+        "score": 71,
+        "verdict": "Навыки совпадают, но роль больше про отчётность, чем про продукт.",
+        "matched": [
+          "Python",
+          "SQL",
+          "Power BI"
+        ],
+        "missing": [
+          "Статистические тесты"
+        ],
+        "red_flags": [
+          "Зарплата на нижней границе ожиданий"
+        ]
+      }
     },
     {
-      "id": "demo:5", "source": "web", "title": "Аналитик продукта (EdTech)",
-      "company": "EduNova (демо)", "salary_from": null, "salary_to": null,
+      "id": "demo:5",
+      "source": "web",
+      "title": "Аналитик продукта (EdTech)",
+      "company": "EduNova (демо)",
+      "salary_from": null,
+      "salary_to": null,
       "requirements": "Опыт продуктовой аналитики, SQL, понимание юнит-экономики.",
       "duties": "Считать юнит-экономику курсов, анализировать удержание студентов, помогать команде приоритизировать фичи.",
       "conditions": "Удалённо.",
-      "skills": ["SQL", "Юнит-экономика"],
-      "match": {"score": 68, "verdict": "Подходит по продуктовой аналитике, но нет опыта в EdTech и юнит-экономике, зарплата не указана.",
-        "matched": ["SQL", "Продуктовые метрики"], "missing": ["Юнит-экономика", "Опыт в EdTech"], "red_flags": ["Зарплата не указана"]}
+      "skills": [
+        "SQL",
+        "Юнит-экономика"
+      ],
+      "match": {
+        "score": 68,
+        "verdict": "Подходит по продуктовой аналитике, но нет опыта в EdTech и юнит-экономике, зарплата не указана.",
+        "matched": [
+          "SQL",
+          "Продуктовые метрики"
+        ],
+        "missing": [
+          "Юнит-экономика",
+          "Опыт в EdTech"
+        ],
+        "red_flags": [
+          "Зарплата не указана"
+        ]
+      }
     },
     {
-      "id": "demo:6", "source": "hh.ru", "title": "Ведущий бизнес-аналитик (банк)",
-      "company": "Северный банк (демо)", "salary_from": 250000, "salary_to": 300000,
+      "id": "demo:6",
+      "source": "hh.ru",
+      "title": "Ведущий бизнес-аналитик (банк)",
+      "company": "Северный банк (демо)",
+      "salary_from": 250000,
+      "salary_to": 300000,
       "requirements": "Опыт от 6 лет, банковские процессы, управление командой аналитиков.",
       "duties": "Руководить группой из 4 аналитиков, вести ключевые проекты кредитного конвейера.",
       "conditions": "Гибрид или удалённо.",
-      "skills": ["Управление командой", "Банковские процессы"],
-      "match": {"score": 58, "verdict": "Интересная зарплата и финтех-домен, но нужен опыт руководства командой и банковских процессов.",
-        "matched": ["Сбор требований", "BPMN"], "missing": ["Управление командой", "6+ лет опыта", "Кредитный конвейер"], "red_flags": ["Уровень выше текущего"]}
+      "skills": [
+        "Управление командой",
+        "Банковские процессы"
+      ],
+      "match": {
+        "score": 58,
+        "verdict": "Интересная зарплата и финтех-домен, но нужен опыт руководства командой и банковских процессов.",
+        "matched": [
+          "Сбор требований",
+          "BPMN"
+        ],
+        "missing": [
+          "Управление командой",
+          "6+ лет опыта",
+          "Кредитный конвейер"
+        ],
+        "red_flags": [
+          "Уровень выше текущего"
+        ]
+      }
     },
     {
-      "id": "demo:7", "source": "career.habr.com", "title": "Junior аналитик данных",
-      "company": "АгроДата (демо)", "salary_from": 80000, "salary_to": 100000,
+      "id": "demo:7",
+      "source": "career.habr.com",
+      "title": "Junior аналитик данных",
+      "company": "АгроДата (демо)",
+      "salary_from": 80000,
+      "salary_to": 100000,
       "requirements": "Базовый SQL, Excel.",
       "duties": "Выгрузки и простые отчёты.",
       "conditions": "Удалённо.",
-      "skills": ["SQL", "Excel"],
-      "match": {"score": 35, "verdict": "Роль ниже уровня кандидата, зарплата значительно ниже ожиданий.",
-        "matched": ["SQL", "Excel"], "missing": [], "red_flags": ["Зарплата ниже минимума", "Junior-позиция"]}
+      "skills": [
+        "SQL",
+        "Excel"
+      ],
+      "match": {
+        "score": 35,
+        "verdict": "Роль ниже уровня кандидата, зарплата значительно ниже ожиданий.",
+        "matched": [
+          "SQL",
+          "Excel"
+        ],
+        "missing": [],
+        "red_flags": [
+          "Зарплата ниже минимума",
+          "Junior-позиция"
+        ]
+      }
     }
   ],
   "applications": [
-    {"vacancy_id": "demo:1", "stage": "interview", "applied_days_ago": 6, "contact": "Ирина, рекрутер (вымышленный контакт)",
+    {
+      "vacancy_id": "demo:1",
+      "stage": "interview",
+      "applied_days_ago": 6,
+      "contact": "Ирина, рекрутер (вымышленный контакт)",
       "notes": "Первое интервью прошло хорошо. Следующий шаг — тестовое задание по A/B-тесту.",
       "cover_letter_subject": "Продуктовый аналитик: финтех, SQL/Python, A/B-тесты",
-      "cover_letter": "Здравствуйте! Я продуктовый аналитик с пятью годами опыта, из них три — в финтехе, поэтому ваша вакансия мне особенно близка.\n\nВ последнем проекте я выстроила систему A/B-тестов для мобильного приложения: от дизайна эксперимента до расчёта значимости на Python. Регулярно пишу сложные SQL-запросы с оконными функциями и строю дашборды по retention и конверсиям, которыми пользуются продакт-менеджеры.\n\nС Amplitude напрямую не работала, но много работала с похожими инструментами событийной аналитики, поэтому быстро освоюсь.\n\nБуду рада созвониться и рассказать подробнее о своих кейсах."},
-    {"vacancy_id": "demo:2", "stage": "applied", "applied_days_ago": 2, "contact": "", "notes": "Откликнулась через сайт компании.",
-      "cover_letter_subject": "", "cover_letter": ""},
-    {"vacancy_id": "demo:3", "stage": "interesting", "applied_days_ago": null, "contact": "", "notes": "Подтянуть UML до отклика.",
-      "cover_letter_subject": "", "cover_letter": ""},
-    {"vacancy_id": "demo:6", "stage": "rejected", "applied_days_ago": 14, "contact": "", "notes": "Отказ: ищут кандидата с опытом руководства.",
-      "cover_letter_subject": "", "cover_letter": ""}
+      "cover_letter": "Здравствуйте! Я продуктовый аналитик с пятью годами опыта, из них три — в финтехе, поэтому ваша вакансия мне особенно близка.\n\nВ последнем проекте я выстроила систему A/B-тестов для мобильного приложения: от дизайна эксперимента до расчёта значимости на Python. Регулярно пишу сложные SQL-запросы с оконными функциями и строю дашборды по retention и конверсиям, которыми пользуются продакт-менеджеры.\n\nС Amplitude напрямую не работала, но много работала с похожими инструментами событийной аналитики, поэтому быстро освоюсь.\n\nБуду рада созвониться и рассказать подробнее о своих кейсах.",
+      "cover_letter_tone": "business"
+    },
+    {
+      "vacancy_id": "demo:2",
+      "stage": "applied",
+      "applied_days_ago": 2,
+      "contact": "",
+      "notes": "Откликнулась через сайт компании.",
+      "cover_letter_subject": "",
+      "cover_letter": ""
+    },
+    {
+      "vacancy_id": "demo:3",
+      "stage": "interesting",
+      "applied_days_ago": null,
+      "contact": "",
+      "notes": "Подтянуть UML до отклика.",
+      "cover_letter_subject": "",
+      "cover_letter": ""
+    },
+    {
+      "vacancy_id": "demo:6",
+      "stage": "rejected",
+      "applied_days_ago": 14,
+      "contact": "",
+      "notes": "Отказ: ищут кандидата с опытом руководства.",
+      "cover_letter_subject": "",
+      "cover_letter": ""
+    },
+    {
+      "vacancy_id": "demo:5",
+      "stage": "no_response",
+      "applied_days_ago": 13,
+      "contact": "",
+      "notes": "Ответа нет почти две недели — трекер перенёс сам.",
+      "cover_letter_subject": "",
+      "cover_letter": ""
+    }
   ]
 }

@@ -2,7 +2,7 @@
 
 export type Mark = 'saved' | 'hidden' | null
 
-export type Stage = 'interesting' | 'applied' | 'interview' | 'offer' | 'rejected'
+export type Stage = 'interesting' | 'applied' | 'no_response' | 'interview' | 'offer' | 'rejected'
 
 export type Tone = 'business' | 'friendly'
 
@@ -13,7 +13,9 @@ export interface Application {
   applied_at: string | null
   cover_letter: string
   cover_letter_subject: string
+  cover_letter_tone: string | null
   updated_at: string
+  stage_changed_at: string | null
 }
 
 export interface FeedItem {
@@ -111,6 +113,40 @@ export class ApiError extends Error {
   }
 }
 
+export interface RateRow {
+  label: string
+  sent: number
+  positive: number
+  rate: number
+}
+
+export interface Advice {
+  summary: string
+  resume: string[]
+  letters: string[]
+  search: string[]
+  generated_at: string
+  based_on_sent: number
+}
+
+export interface Analytics {
+  total: number
+  stages: Partial<Record<Stage, number>>
+  sent: number
+  sent_last_7_days: number
+  positive: number
+  rejected: number
+  no_response: number
+  waiting: number
+  response_rate: number | null
+  by_letter: RateRow[]
+  by_score: RateRow[]
+  by_source: RateRow[]
+  top_gaps: { skill: string; count: number }[]
+  no_response_days: number
+  advice: Advice | null
+}
+
 export type FeedView = 'all' | 'saved' | 'hidden'
 
 export const OFFLINE_MESSAGE =
@@ -173,6 +209,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ tone, wishes }),
     }),
+  analytics: () => request<Analytics>('/api/analytics'),
+  makeAdvice: () => request<Advice>('/api/analytics/advice', { method: 'POST' }),
   profile: () => request<Profile>('/api/profile'),
   saveProfile: (profile: Profile) =>
     request<Profile>('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }),

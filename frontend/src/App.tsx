@@ -2,6 +2,7 @@ import { BriefcaseBusiness, LogIn, LogOut, Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ApiError, api } from './api'
 import type { Me } from './api'
+import { AnalyticsPage } from './components/AnalyticsPage'
 import { FeedPage } from './components/FeedPage'
 import { LoginPage } from './components/LoginPage'
 import { ProfilePage } from './components/ProfilePage'
@@ -10,17 +11,19 @@ import { TrackerPage } from './components/TrackerPage'
 import { Spinner } from './components/ui'
 import { SessionContext } from './session'
 
-type Tab = 'feed' | 'tracker' | 'profile' | 'login'
+type Tab = 'feed' | 'tracker' | 'analytics' | 'profile' | 'login'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'feed', label: 'Вакансии' },
   { id: 'tracker', label: 'Отклики' },
+  { id: 'analytics', label: 'Аналитика' },
   { id: 'profile', label: 'Профиль' },
 ]
 
 function tabFromHash(): Tab {
   const tab = window.location.hash.replace('#/', '')
-  return tab === 'profile' || tab === 'tracker' || tab === 'login' ? tab : 'feed'
+  const known: Tab[] = ['tracker', 'analytics', 'profile', 'login']
+  return known.includes(tab as Tab) ? (tab as Tab) : 'feed'
 }
 
 type SessionState = { status: 'loading' } | { status: 'ready'; me: Me } | { status: 'login' } | { status: 'error'; message: string }
@@ -75,14 +78,14 @@ export default function App() {
             </a>
 
             {me && (
-              <nav className="flex gap-0.5 sm:gap-1" aria-label="Разделы">
+              <nav className="-mx-1 flex min-w-0 gap-0.5 overflow-x-auto px-1 sm:gap-1" aria-label="Разделы">
                 {TABS.map((t) => (
                   <button
                     key={t.id}
                     type="button"
                     onClick={() => go(t.id)}
                     aria-current={tab === t.id ? 'page' : undefined}
-                    className={`rounded-lg px-2 py-2 text-sm font-medium transition-colors sm:px-3 ${
+                    className={`shrink-0 rounded-lg px-2 py-2 text-sm font-medium transition-colors sm:px-3 ${
                       tab === t.id
                         ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                         : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
@@ -166,6 +169,7 @@ export default function App() {
             <>
               {tab === 'feed' && <FeedPage reloadKey={reloadKey} onGoToProfile={() => go('profile')} />}
               {tab === 'tracker' && <TrackerPage onGoToFeed={() => go('feed')} />}
+              {tab === 'analytics' && <AnalyticsPage onGoToFeed={() => go('feed')} />}
               {tab === 'profile' && <ProfilePage onSaved={() => setReloadKey((k) => k + 1)} />}
             </>
           )}

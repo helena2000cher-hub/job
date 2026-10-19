@@ -1,17 +1,21 @@
 import { Bookmark, BookmarkCheck, ExternalLink, Eye, EyeOff, House, MapPin, Sparkles } from 'lucide-react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { FeedItem, Mark } from '../api'
+import type { Application, FeedItem, Mark } from '../api'
 import { fitLabel, formatDate, formatSalary, sourceLabel } from '../format'
-import { STAGES } from '../stages'
+import { STAGES, shouldAskApplied } from '../stages'
+import { AppliedPrompt } from './AppliedPrompt'
 import { Chip, ScoreBadge } from './ui'
 
 interface Props {
   item: FeedItem
   onOpen: () => void
   onMark: (status: Mark) => void
+  onApplicationChange?: (application: Application) => void
 }
 
-export function VacancyCard({ item, onOpen, onMark }: Props) {
+export function VacancyCard({ item, onOpen, onMark, onApplicationChange }: Props) {
+  const [askApplied, setAskApplied] = useState(false)
   const saved = item.mark === 'saved'
   const hidden = item.mark === 'hidden'
 
@@ -88,6 +92,7 @@ export function VacancyCard({ item, onOpen, onMark }: Props) {
                 href={item.url}
                 target="_blank"
                 rel="noreferrer"
+                onClick={() => shouldAskApplied(item.stage) && setAskApplied(true)}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                 title="Открыть на сайте"
                 aria-label="Открыть на сайте"
@@ -96,6 +101,17 @@ export function VacancyCard({ item, onOpen, onMark }: Props) {
               </a>
             </div>
           </div>
+          {askApplied && (
+            <div className="mt-3">
+              <AppliedPrompt
+                vacancyId={item.id}
+                onAnswered={(application) => {
+                  if (application) onApplicationChange?.(application)
+                  setAskApplied(false)
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
     </article>

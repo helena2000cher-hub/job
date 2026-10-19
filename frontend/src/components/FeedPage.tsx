@@ -182,6 +182,7 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
                   item={item}
                   onOpen={() => setOpenId(item.id)}
                   onMark={(status) => mark(item.id, status)}
+                  onApplicationChange={(application) => applicationChanged(item.id, application)}
                 />
               ))}
             </div>
