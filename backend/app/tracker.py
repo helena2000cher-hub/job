@@ -109,6 +109,22 @@ def compute_analytics(
                     spellings[key][skill.strip()] += 1
 
     week_ago = today - timedelta(days=7)
+    sent_list = [
+        {
+            "id": v.id,
+            "title": v.title,
+            "company": v.company,
+            "url": v.url,
+            "source": v.source,
+            "score": m.score if m else None,
+            "stage": a.stage,
+            "applied_at": a.applied_at.isoformat() if a.applied_at else None,
+            "days_since": (today - a.applied_at).days if a.applied_at else None,
+            "has_letter": bool(a.cover_letter),
+            "notes": a.notes,
+        }
+        for a, v, m in sorted(sent_rows, key=lambda r: r[0].applied_at or date.min, reverse=True)
+    ]
     return {
         "total": len(rows),
         "stages": {s: stages.get(s, 0) for s in stages},
@@ -126,6 +142,7 @@ def compute_analytics(
         "by_source": _rows(by_source),
         "top_gaps": [{"skill": _label(spellings[k]), "count": n} for k, n in gaps.most_common(12)],
         "no_response_days": NO_RESPONSE_DAYS,
+        "sent_list": sent_list,
     }
 
 

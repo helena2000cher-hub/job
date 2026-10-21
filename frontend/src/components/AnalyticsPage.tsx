@@ -1,25 +1,40 @@
-import { FileText, Lightbulb, Mail, Search, Sparkles } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ExternalLink, FileText, Lightbulb, Mail, Search, Sparkles } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { api } from '../api'
-import type { Advice, Analytics, RateRow } from '../api'
-import { formatDateTime, sourceLabel } from '../format'
+import type { Advice, Analytics, RateRow, SentItem, Stage } from '../api'
+import { formatDate, formatDateTime, sourceLabel } from '../format'
 import { useIsDemo } from '../session'
 import { STAGES } from '../stages'
 import { Button, EmptyState, Spinner } from './ui'
+import { VacancyDrawer } from './VacancyDrawer'
 
 const RELIABLE_SAMPLE = 10 // столько отправленных откликов нужно, чтобы доли что-то значили
 
 export function AnalyticsPage({ onGoToFeed }: { onGoToFeed: () => void }) {
   const [data, setData] = useState<Analytics | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     api
       .analytics()
       .then(setData)
       .catch((e: Error) => setError(e.message))
-  }, [])
+  }, [reloadKey])
+
+  const reload = useCallback(() => setReloadKey((k) => k + 1), [])
+  const closeDrawer = useCallback(() => setOpenId(null), [])
+
+  const changeStage = async (id: string, stage: Stage) => {
+    try {
+      await api.updateApplication(id, { stage })
+      reload()
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
 
   if (error) return <p className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{error}</p>
   if (!data) {
@@ -55,7 +70,7 @@ export function AnalyticsPage({ onGoToFeed }: { onGoToFeed: () => void }) {
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <Stat label="Отправлено" value={data.sent} />
-            <Stat label="Приглашений" value={data.positive} hint="собеседование или оффер" />
+            <Stat label="Приглашений" value={data.positive} hint="тестовое, собеседование, оффер" />
             <Stat label="Доля приглашений" value={rate} />
             <Stat label="Ждут ответа" value={data.waiting} />
             <Stat label="Без ответа" value={data.no_response} />
@@ -68,6 +83,14 @@ export function AnalyticsPage({ onGoToFeed }: { onGoToFeed: () => void }) {
               {RELIABLE_SAMPLE}–15 откликов. За последнюю неделю отправлено: {data.sent_last_7_days}.
             </p>
           )}
+
+          <Panel title={`Мои отклики (${data.sent_list.length})`}>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Пришёл ответ, прислали тестовое или позвали на собеседование — поменяйте этап, статистика
+              обновится. Нажмите на название, чтобы открыть вакансию, письмо и заметки.
+            </p>
+            <SentList items={data.sent_list} onOpen={setOpenId} onStage={changeStage} />
+          </Panel>
 
           <Panel title="Где сейчас отклики">
             <Funnel data={data} />
@@ -108,8 +131,90 @@ export function AnalyticsPage({ onGoToFeed }: { onGoToFeed: () => void }) {
       )}
 
       <AdviceBlock initial={data.advice} sent={data.sent} />
+
+      {openId && (
+        <VacancyDrawer
+          key={openId}
+          id={openId}
+          onClose={closeDrawer}
+          onMark={(id, status) => api.mark(id, status).catch(() => undefined)}
+          onApplicationChange={reload}
+        />
+      )}
     </div>
   )
+}
+
+/** Отправленные отклики: дата, этап (меняется прямо здесь), письмо, ссылка на вакансию. */
+function SentList({
+  items,
+  onOpen,
+  onStage,
+}: {
+  items: SentItem[]
+  onOpen: (id: string) => void
+  onStage: (id: string, stage: Stage) => void
+}) {
+  return (
+    <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+      {items.map((item) => (
+        <li key={item.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0">
+          <div className="min-w-[12rem] flex-1">
+            <button
+              type="button"
+              onClick={() => onOpen(item.id)}
+              className="text-left text-sm font-medium text-slate-900 hover:text-indigo-600 dark:text-slate-100 dark:hover:text-indigo-400"
+            >
+              {item.title}
+            </button>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              {item.company ?? 'Компания не указана'} · {sourceLabel(item.source)}
+              {item.score !== null && ` · ${item.score} баллов`}
+            </p>
+            {item.notes && <p className="mt-0.5 line-clamp-1 text-xs text-slate-600 dark:text-slate-300">{item.notes}</p>}
+          </div>
+          <span className="w-28 text-xs tabular-nums text-slate-500 dark:text-slate-400">
+            {item.applied_at ? formatDate(item.applied_at) : '—'}
+            {item.days_since !== null && <span className="block">{daysAgo(item.days_since)}</span>}
+          </span>
+          <select
+            value={item.stage}
+            onChange={(e) => onStage(item.id, e.target.value as Stage)}
+            aria-label={`Этап: ${item.title}`}
+            className="rounded-lg border-0 bg-slate-100 py-1.5 pl-2 pr-7 text-sm dark:bg-slate-800"
+          >
+            {STAGES.filter((s) => s.id !== 'interesting').map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <span className="flex w-16 items-center justify-end gap-1 text-slate-400">
+            {item.has_letter && <Mail className="h-4 w-4" aria-label="Есть сопроводительное письмо" />}
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg p-1 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              aria-label="Открыть вакансию на сайте"
+              title="Открыть вакансию на сайте"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function daysAgo(days: number): string {
+  if (days === 0) return 'сегодня'
+  if (days === 1) return 'вчера'
+  const mod10 = days % 10
+  const mod100 = days % 100
+  const word = mod10 === 1 && mod100 !== 11 ? 'день' : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'дня' : 'дней'
+  return `${days} ${word} назад`
 }
 
 function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {

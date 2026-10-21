@@ -2,7 +2,14 @@
 
 export type Mark = 'saved' | 'hidden' | null
 
-export type Stage = 'interesting' | 'applied' | 'no_response' | 'interview' | 'offer' | 'rejected'
+export type Stage =
+  | 'interesting'
+  | 'applied'
+  | 'no_response'
+  | 'test_task'
+  | 'interview'
+  | 'offer'
+  | 'rejected'
 
 export type Tone = 'business' | 'friendly'
 
@@ -144,7 +151,22 @@ export interface Analytics {
   by_source: RateRow[]
   top_gaps: { skill: string; count: number }[]
   no_response_days: number
+  sent_list: SentItem[]
   advice: Advice | null
+}
+
+export interface SentItem {
+  id: string
+  title: string
+  company: string | null
+  url: string
+  source: string
+  score: number | null
+  stage: Stage
+  applied_at: string | null
+  days_since: number | null
+  has_letter: boolean
+  notes: string
 }
 
 export type FeedView = 'all' | 'saved' | 'hidden'

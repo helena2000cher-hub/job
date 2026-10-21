@@ -72,11 +72,11 @@ class VacancyMark(SQLModel, table=True):
 
 
 # Колонки трекера откликов, в порядке движения по воронке
-STAGES = ("interesting", "applied", "no_response", "interview", "offer", "rejected")
+STAGES = ("interesting", "applied", "no_response", "test_task", "interview", "offer", "rejected")
 # Этапы, на которых отклик уже отправлен
-SENT_STAGES = ("applied", "no_response", "interview", "offer", "rejected")
-# Этапы, где работодатель ответил приглашением
-POSITIVE_STAGES = ("interview", "offer")
+SENT_STAGES = ("applied", "no_response", "test_task", "interview", "offer", "rejected")
+# Этапы, где работодатель ответил приглашением (тестовое — тоже интерес к кандидату)
+POSITIVE_STAGES = ("test_task", "interview", "offer")
 NO_RESPONSE_DAYS = 10
 
 

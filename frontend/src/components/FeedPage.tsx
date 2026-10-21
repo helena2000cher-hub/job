@@ -14,7 +14,7 @@ const SCORE_FILTERS = [
 
 const VIEWS: { value: FeedView; label: string }[] = [
   { value: 'all', label: 'Подобранные' },
-  { value: 'saved', label: 'В трекере' },
+  { value: 'saved', label: 'Мои отклики' },
   { value: 'hidden', label: 'Скрытые' },
 ]
 
@@ -30,6 +30,7 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
   const [feed, setFeed] = useState<Feed | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -89,7 +90,10 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
 
   const closeDrawer = useCallback(() => setOpenId(null), [])
 
-  const items = feed?.items ?? []
+  const needle = query.trim().toLowerCase()
+  const items = (feed?.items ?? []).filter(
+    (i) => !needle || `${i.title} ${i.company ?? ''}`.toLowerCase().includes(needle),
+  )
   const counts = {
     great: items.filter((i) => (i.score ?? 0) >= 80).length,
     good: items.filter((i) => (i.score ?? 0) >= 60 && (i.score ?? 0) < 80).length,
@@ -113,6 +117,14 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Поиск: название или компания"
+          aria-label="Поиск по названию или компании"
+          className="min-w-[12rem] flex-1 rounded-lg border-0 bg-slate-100 px-3 py-1.5 text-sm placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800"
+        />
         <Segmented options={VIEWS} value={view} onChange={setView} label="Какие вакансии показать" />
         <Segmented options={SCORE_FILTERS} value={minScore} onChange={changeMinScore} label="Минимальный балл" />
         <select
@@ -158,7 +170,9 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
             {view === 'all' &&
               (feed.scored === 0
                 ? 'Нажмите «Найти вакансии» справа вверху — сервис соберёт вакансии по вашим навыкам и оценит их.'
-                : 'Попробуйте показать все баллы или выбрать другой сайт.')}
+                : needle
+                  ? `По запросу «${query.trim()}» ничего не найдено — проверьте фильтры по баллу и сайту.`
+                  : 'Попробуйте показать все баллы или выбрать другой сайт.')}
           </EmptyState>
         )}
 

@@ -212,3 +212,27 @@ def test_analytics_and_advice_endpoints(client):
     assert advice["summary"] == "Хорошо"
     # совет сохранён и отдаётся вместе с аналитикой
     assert client.get("/api/analytics").json()["advice"]["resume"] == ["Совет"]
+
+
+def test_sent_list_and_test_task_counts_as_response(session):
+    add_app(session, 1, "applied", 3, notes="ждём")
+    add_app(session, 2, "test_task", 6, cover_letter="п")
+    add_app(session, 3, "interesting")  # не отправлено — в списке не нужно
+
+    stats = compute_analytics(session, None, TODAY)
+
+    assert [r["id"] for r in stats["sent_list"]] == ["test:1", "test:2"]  # свежие сверху
+    first = stats["sent_list"][0]
+    assert (first["stage"], first["days_since"], first["notes"]) == ("applied", 3, "ждём")
+    assert stats["sent_list"][1]["has_letter"] is True
+    assert stats["positive"] == 1  # тестовое задание — это ответ работодателя
+    assert stats["response_rate"] == 0.5
+
+
+def test_test_task_stage_accepted_by_api(client):
+    engine = client.app.state.refresh._engine
+    with Session(engine) as s:
+        s.add(make_vacancy(1, "Аналитик"))
+        s.commit()
+    r = client.put("/api/applications/test:1", json={"stage": "test_task"})
+    assert r.status_code == 200 and r.json()["stage"] == "test_task"

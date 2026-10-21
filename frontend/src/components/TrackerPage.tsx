@@ -98,7 +98,7 @@ export function TrackerPage({ onGoToFeed }: { onGoToFeed: () => void }) {
         </EmptyState>
       ) : (
         <div className="-mx-4 overflow-x-auto px-4 pb-2">
-          <div className="grid min-w-[72rem] grid-cols-6 gap-3">
+          <div className="grid min-w-[84rem] grid-cols-7 gap-3">
             {STAGES.map((stage) => {
               const column = items!.filter((i) => i.application.stage === stage.id)
               return (

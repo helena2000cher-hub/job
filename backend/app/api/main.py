@@ -96,7 +96,9 @@ class MarkIn(BaseModel):
     status: Literal["saved", "hidden"] | None
 
 
-Stage = Literal["interesting", "applied", "no_response", "interview", "offer", "rejected"]
+Stage = Literal[
+    "interesting", "applied", "no_response", "test_task", "interview", "offer", "rejected"
+]
 assert set(Stage.__args__) == set(STAGES)
 
 
