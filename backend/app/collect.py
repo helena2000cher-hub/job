@@ -45,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     remote_only = args.remote_only
     if args.from_profile:
         profile = load_profile()
-        queries += profile.search_queries
+        queries += profile.effective_queries()  # запросы отмеченных профессий
         remote_only = remote_only or profile.preferences.remote_only
     if not queries:
         parser.error("нужен --query или --from-profile")

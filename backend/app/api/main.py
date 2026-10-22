@@ -497,6 +497,8 @@ def create_app(
 
     @app.put("/api/profile", response_model=Profile)
     def put_profile(profile: Profile, ws: OwnerDep):  # в демо смена профиля сломала бы ленту
+        if profile.target_roles:  # поиск идёт только по отмеченным профессиям
+            profile.search_queries = profile.effective_queries()
         save_profile(profile, ws.profile_path)
         return profile
 

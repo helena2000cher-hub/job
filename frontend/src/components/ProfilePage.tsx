@@ -4,7 +4,9 @@ import type { KeyboardEvent, ReactNode } from 'react'
 import { api } from '../api'
 import type { CareerOption, Profile } from '../api'
 import { useIsDemo } from '../session'
+import { withRoles } from '../queries'
 import { CareerExplorer } from './CareerExplorer'
+import { QueryPlan } from './QueryPlan'
 import { Button, EmptyState, Spinner } from './ui'
 
 export function ProfilePage({ onSaved }: { onSaved: () => void }) {
@@ -72,25 +74,14 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
     }
   }
 
-  // «Искать эту работу»: профессия попадает в выбранные, её запросы — в поиск; повторно — убираем
+  // «Искать эту работу»: профессия попадает в выбранные (запросы пересчитываются), повторно — убираем
   const toggleCareer = (option: CareerOption) => {
     if (!profile) return
-    const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
-    const chosen = profile.target_roles.some((r) => same(r, option.title))
-    if (chosen) {
-      const roles = profile.target_roles.filter((r) => !same(r, option.title))
-      const stillNeeded = (profile.careers?.options ?? [])
-        .filter((o) => roles.some((r) => same(r, o.title)))
-        .flatMap((o) => o.queries)
-      const queries = profile.search_queries.filter(
-        (q) => !option.queries.some((x) => same(x, q)) || stillNeeded.some((x) => same(x, q)),
-      )
-      setProfile({ ...profile, target_roles: roles, search_queries: queries })
-    } else {
-      const queries = [...profile.search_queries]
-      for (const q of option.queries) if (!queries.some((x) => same(x, q))) queries.push(q)
-      setProfile({ ...profile, target_roles: [...profile.target_roles, option.title], search_queries: queries })
-    }
+    const same = (r: string) => r.trim().toLowerCase() === option.title.trim().toLowerCase()
+    const roles = profile.target_roles.some(same)
+      ? profile.target_roles.filter((r) => !same(r))
+      : [...profile.target_roles, option.title]
+    setProfile(withRoles(profile, roles))
   }
 
   if (status === 'loading') {
@@ -179,13 +170,8 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
       />
 
       <fieldset disabled={isDemo} className="space-y-6 disabled:opacity-90">
-      <Card title="Что и где искать" subtitle="Выбранные профессии и запросы, по которым «Найти вакансии» собирает вакансии.">
-        <Field label="Выбранные профессии" hint="Добавляются кнопкой «Искать эту работу» выше или вручную.">
-          <TagEditor values={profile.target_roles} onChange={(v) => set('target_roles', v)} placeholder="Добавить профессию" />
-        </Field>
-        <Field label="Поисковые запросы" hint="Короткие, 1–3 слова — как вводили бы на hh.ru">
-          <TagEditor values={profile.search_queries} onChange={(v) => set('search_queries', v)} placeholder="Добавить запрос" />
-        </Field>
+      <Card title="Что и где искать" subtitle="«Найти вакансии» ищет только по отмеченным профессиям — по запросам из их карточек.">
+        <QueryPlan profile={profile} onRoles={(roles) => setProfile(withRoles(profile, roles))} />
         <label className="flex items-center gap-3">
           <input
             type="checkbox"

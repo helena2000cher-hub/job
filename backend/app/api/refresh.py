@@ -51,7 +51,7 @@ def default_runner(state: RefreshState, sources: list[str], engine: Engine, prof
         state.log.append(f"Сбор: {source}…")
         result = collect(
             source,
-            profile.search_queries,
+            profile.effective_queries(),  # только отмеченные профессии
             remote_only=prefs.remote_only,
             region_code=region,
             limit=LIMITS.get(source, 30),

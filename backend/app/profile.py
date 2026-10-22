@@ -61,11 +61,37 @@ class Profile(BaseModel):
             lines.append(f"Дополнительно (нет в резюме): {self.extra.strip()}")
         return "\n".join(lines)
 
+    def query_plan(self) -> list[tuple[str, list[str]]]:
+        """What the search looks for: each selected profession with its queries.
+
+        Queries come from the profession's card in «Кем я могу работать»; a profession without a
+        card (added by hand or left from the resume) is searched by its own title.
+        """
+        cards = {_norm(o.title): o for o in (self.careers.options if self.careers else [])}
+        plan = []
+        for role in self.target_roles:
+            card = cards.get(_norm(role))
+            plan.append((role, list(card.queries) if card and card.queries else [role]))
+        return plan
+
+    def effective_queries(self) -> list[str]:
+        """Search queries = queries of the selected professions only (no duplicates)."""
+        queries: list[str] = []
+        for _, qs in self.query_plan():
+            for q in qs:
+                if not any(_norm(q) == _norm(x) for x in queries):
+                    queries.append(q)
+        return queries or list(self.search_queries)  # профессий нет — старый список запросов
+
     def fingerprint(self) -> str:
         """Changes whenever the profile changes — cached match scores are then recomputed."""
         # Имя и подсказки профессий на оценку не влияют — их смена не сбрасывает оценки
         data = self.model_dump_json(exclude={"name", "careers"})
         return hashlib.sha256(data.encode()).hexdigest()[:16]
+
+
+def _norm(text: str) -> str:
+    return " ".join(text.lower().split())
 
 
 SYSTEM_PROMPT = """Ты — опытный IT-рекрутер.

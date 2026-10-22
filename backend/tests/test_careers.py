@@ -67,3 +67,61 @@ def test_careers_endpoint_saves_without_touching_scores(tmp_path, profile):
     # прошлая должность в подбор не передаётся — подсказки идут от навыков
     _, user, _ = llm.chat_calls[0]
     assert profile.headline not in user
+
+
+def _profile_with_cards():
+    from app.careers import CareerOption, CareerSuggestions
+    from app.profile import Profile
+
+    cards = CareerSuggestions(
+        options=[
+            CareerOption(title="AI-инженер / LLM-разработчик", kind="core",
+                         queries=["AI инженер", "LLM разработчик"]),
+            CareerOption(title="Бизнес-аналитик", kind="adjacent",
+                         queries=["бизнес-аналитик", "ai инженер"]),  # дубль другого регистра
+        ]
+    )  # fmt: skip
+    return Profile(
+        headline="x",
+        target_roles=["Бизнес-аналитик", "ai-инженер / llm-разработчик", "Финансовый аналитик"],
+        skills=["Python"],
+        search_queries=["старый запрос из резюме"],
+        careers=cards,
+    )
+
+
+def test_query_plan_groups_queries_by_profession():
+    plan = _profile_with_cards().query_plan()
+    assert plan == [
+        ("Бизнес-аналитик", ["бизнес-аналитик", "ai инженер"]),
+        ("ai-инженер / llm-разработчик", ["AI инженер", "LLM разработчик"]),  # регистр не важен
+        ("Финансовый аналитик", ["Финансовый аналитик"]),  # без карточки — по названию
+    ]
+
+
+def test_effective_queries_only_selected_professions():
+    profile = _profile_with_cards()
+    assert profile.effective_queries() == [
+        "бизнес-аналитик", "ai инженер", "LLM разработчик", "Финансовый аналитик"
+    ]  # fmt: skip
+    assert "старый запрос из резюме" not in profile.effective_queries()
+
+    profile.target_roles = []
+    assert profile.effective_queries() == ["старый запрос из резюме"]  # профессий нет — старое
+
+
+def test_saving_profile_syncs_queries_with_professions(tmp_path, profile):
+    path = tmp_path / "profile.json"
+    save_profile(profile, path)
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    client = TestClient(create_app(engine, path, serve_frontend=False))
+    data = _profile_with_cards().model_dump(mode="json")
+
+    saved = client.put("/api/profile", json=data).json()
+
+    assert saved["search_queries"] == [
+        "бизнес-аналитик", "ai инженер", "LLM разработчик", "Финансовый аналитик"
+    ]  # fmt: skip
+    assert load_profile(path).search_queries == saved["search_queries"]
