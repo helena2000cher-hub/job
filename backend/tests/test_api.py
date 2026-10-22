@@ -11,6 +11,10 @@ from app.profile import save_profile
 from tests.conftest import make_vacancy
 
 
+def ALL_SOURCES():  # noqa: N802 — тесты не зависят от ключей в .env
+    return {"exa": True, "trudvsem": True, "superjob": True}
+
+
 @pytest.fixture
 def engine():
     return create_engine(
@@ -57,7 +61,9 @@ def client(engine, profile_path, profile):
         calls.append(sources)
         state.log.append("собрано")
 
-    app = create_app(engine, profile_path, fake_runner, serve_frontend=False)
+    app = create_app(
+        engine, profile_path, fake_runner, serve_frontend=False, available_sources=ALL_SOURCES
+    )
     seed(engine, profile)
     c = TestClient(app)
     c.runner_calls = calls
@@ -142,7 +148,13 @@ def test_refresh_rejects_parallel_runs(engine, profile_path):
     import threading
 
     gate = threading.Event()
-    app = create_app(engine, profile_path, lambda *a: gate.wait(2), serve_frontend=False)
+    app = create_app(
+        engine,
+        profile_path,
+        lambda *a: gate.wait(2),
+        serve_frontend=False,
+        available_sources=ALL_SOURCES,
+    )
     c = TestClient(app)
     assert c.post("/api/refresh", json={}).status_code == 202
     assert c.post("/api/refresh", json={}).status_code == 409
@@ -154,3 +166,16 @@ def test_no_profile(engine, tmp_path):
     assert c.get("/api/profile").status_code == 404
     assert c.get("/api/feed").json()["profile_ready"] is False
     assert c.post("/api/refresh", json={}).status_code == 400
+
+
+def test_sources_and_missing_key(engine, profile_path):
+    app = create_app(
+        engine,
+        profile_path,
+        serve_frontend=False,
+        available_sources=lambda: {"exa": False, "trudvsem": True, "superjob": False},
+    )
+    c = TestClient(app)
+    assert c.get("/api/sources").json() == {"exa": False, "trudvsem": True, "superjob": False}
+    r = c.post("/api/refresh", json={"sources": ["superjob"]})
+    assert r.status_code == 400 and "нет ключа" in r.json()["detail"]

@@ -22,6 +22,8 @@ export const SOURCE_LABELS: Record<string, string> = {
   trudvsem: 'Работа России',
   'hh.ru': 'hh.ru',
   'career.habr.com': 'Хабр Карьера',
+  'superjob.ru': 'SuperJob',
+  manual: 'добавлено вручную',
 }
 
 export function sourceLabel(source: string): string {

@@ -21,8 +21,10 @@ class Settings(BaseSettings):
     embedding_model: str = "baai/bge-m3"
 
     exa_api_key: str = ""
+    superjob_api_key: str = ""  # бесплатно: https://api.superjob.ru/register/
 
     default_region_code: str = "5900000000000"  # Пермский край
+    default_town: str = "Пермь"  # для SuperJob
 
     # Веб-доступ. Пустой пароль — вход не нужен (локальная разработка), демо выключено.
     app_password: str = ""

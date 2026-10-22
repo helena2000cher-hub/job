@@ -20,7 +20,7 @@ from app.profile import load_profile
 log = logging.getLogger(__name__)
 
 # Сколько вакансий брать на один запрос из профиля: Exa платный, trudvsem медленный.
-LIMITS = {"exa": 20, "trudvsem": 50}
+LIMITS = {"exa": 20, "trudvsem": 50, "superjob": 50}
 MATCH_TOP_N = 40
 
 

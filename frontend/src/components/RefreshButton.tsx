@@ -5,13 +5,15 @@ import type { RefreshState } from '../api'
 import { Button, Spinner } from './ui'
 
 const SOURCES = [
-  { id: 'exa', label: 'hh.ru, Хабр Карьера, сайты компаний', hint: 'поиск через Exa · ≈ $0.5 из бесплатных $10 в месяц' },
-  { id: 'trudvsem', label: 'Работа России', hint: 'бесплатно · медленно, 3–6 минут' },
+  { id: 'exa', label: 'hh.ru, Хабр Карьера, сайты компаний', hint: 'поиск через Exa · ≈ $0.5 из бесплатных $10 в месяц', noKey: 'нужен EXA_API_KEY в .env' },
+  { id: 'superjob', label: 'SuperJob', hint: 'официальный API · бесплатно', noKey: 'нужен бесплатный ключ: api.superjob.ru/register → SUPERJOB_API_KEY в .env' },
+  { id: 'trudvsem', label: 'Работа России', hint: 'бесплатно · медленно, 3–6 минут', noKey: '' },
 ]
 
 export function RefreshButton({ onDone }: { onDone: () => void }) {
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string[]>(['exa'])
+  const [available, setAvailable] = useState<Record<string, boolean>>({ exa: true, trudvsem: true })
   const [state, setState] = useState<RefreshState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pollRun, setPollRun] = useState(0) // +1 при каждом запуске — перезапускает опрос
@@ -22,6 +24,18 @@ export function RefreshButton({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     onDoneRef.current = onDone
   }, [onDone])
+
+  // Какие источники подключены (у части нужен ключ в .env); неподключённые нельзя выбрать
+  useEffect(() => {
+    if (!open) return
+    api
+      .sources()
+      .then((a) => {
+        setAvailable(a)
+        setSelected((sel) => sel.filter((id) => a[id]))
+      })
+      .catch(() => undefined)
+  }, [open])
 
   // Опрашиваем статус, пока идёт обновление (и один раз при открытии страницы —
   // вдруг обновление уже запущено). По завершении перезагружаем ленту.
@@ -96,23 +110,29 @@ export function RefreshButton({ onDone }: { onDone: () => void }) {
             <>
               <p className="text-sm font-semibold">Где искать вакансии по вашим навыкам</p>
               <div className="mt-3 space-y-2">
-                {SOURCES.map((s) => (
-                  <label
-                    key={s.id}
-                    className="flex cursor-pointer gap-3 rounded-lg p-2 hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(s.id)}
-                      onChange={() => toggle(s.id)}
-                      className="mt-0.5 h-4 w-4 accent-indigo-600"
-                    />
-                    <span>
-                      <span className="block text-sm font-medium">{s.label}</span>
-                      <span className="block text-xs text-slate-500 dark:text-slate-400">{s.hint}</span>
-                    </span>
-                  </label>
-                ))}
+                {SOURCES.map((s) => {
+                  const on = available[s.id] ?? false
+                  return (
+                    <label
+                      key={s.id}
+                      className={`flex gap-3 rounded-lg p-2 ${
+                        on ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60' : 'cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on && selected.includes(s.id)}
+                        disabled={!on}
+                        onChange={() => toggle(s.id)}
+                        className="mt-0.5 h-4 w-4 accent-indigo-600"
+                      />
+                      <span>
+                        <span className="block text-sm font-medium">{s.label}</span>
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">{on ? s.hint : s.noKey}</span>
+                      </span>
+                    </label>
+                  )
+                })}
               </div>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                 {selected.length === 0

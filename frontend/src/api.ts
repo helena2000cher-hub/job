@@ -283,6 +283,7 @@ export const api = {
     request<Profile>('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }),
   suggestCareers: () => request<Profile>('/api/profile/careers', { method: 'POST' }),
   rebuildProfile: () => request<Profile>('/api/profile/rebuild', { method: 'POST' }),
+  sources: () => request<Record<string, boolean>>('/api/sources'),
   refreshStatus: () => request<RefreshState>('/api/refresh'),
   refresh: (sources: string[]) =>
     request<RefreshState>('/api/refresh', { method: 'POST', body: JSON.stringify({ sources }) }),

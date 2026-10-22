@@ -214,6 +214,7 @@ def create_app(
     llm_factory: Callable[[], LLM] = PolzaLLM,
     resume_path: Path = RESUME_PATH,
     vacancy_fetcher: Callable[[str], Vacancy | None] = fetch_vacancy,
+    available_sources: Callable[[], dict[str, bool]] | None = None,
     auth: Auth | None = None,
     demo_engine: Engine | None = None,
     demo_profile_path: Path | None = None,
@@ -557,6 +558,21 @@ def create_app(
         save_advice(advice, advice_path(ws))
         return advice
 
+    def sources_available() -> dict[str, bool]:
+        if available_sources is not None:
+            return available_sources()
+        settings = get_settings()
+        return {
+            "exa": bool(settings.exa_api_key),
+            "trudvsem": True,  # открытый API без ключа
+            "superjob": bool(settings.superjob_api_key),
+        }
+
+    @app.get("/api/sources")
+    def sources():
+        """Какие источники можно включить в «Найти вакансии» (у части нужен ключ в .env)."""
+        return sources_available()
+
     @app.get("/api/refresh")
     def refresh_status(request: Request, ws: WsDep):
         if ws.demo:
@@ -568,6 +584,9 @@ def create_app(
         unknown = set(body.sources) - set(COLLECTORS)
         if unknown:  # пустой список допустим — только пересчитать оценки, без сбора
             raise HTTPException(400, f"Неизвестные источники: {', '.join(unknown)}")
+        missing = [src for src in body.sources if not sources_available().get(src, False)]
+        if missing:
+            raise HTTPException(400, f"Для источника {', '.join(missing)} нет ключа в .env")
         if current_profile(ws) is None:
             raise HTTPException(400, "Сначала создайте профиль")
         if not request.app.state.refresh.start(body.sources):
