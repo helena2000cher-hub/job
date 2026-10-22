@@ -53,11 +53,20 @@ HABR = Site(
 WEB = Site("web")  # карьерные страницы компаний и нишевые сайты
 SITES = {s.name: s for s in (HH, HABR, WEB)}
 
-# Агрегаторы и соцсети: в режиме «web» нужны страницы самих компаний, а не их копии.
+# Агрегаторы, доски объявлений и соцсети: в режиме «web» нужны страницы самих компаний,
+# а не перепосты (часто без названия компании и ссылки на первоисточник). Список — первый
+# фильтр; второй — поле is_employer_page в разборе страницы, он ловит неизвестные агрегаторы.
 AGGREGATORS = [
-    "hh.ru", "career.habr.com", "trudvsem.ru", "superjob.ru", "rabota.ru", "zarplata.ru",
-    "avito.ru", "gorodrabot.ru", "jooble.org", "rabota.yandex.ru", "finder.work",
-    "linkedin.com", "indeed.com", "vk.com", "geekjob.ru", "careerspace.app",
+    # крупные сайты вакансий
+    "hh.ru", "*.hh.ru", "hh.kz", "*.hh.kz", "career.habr.com", "trudvsem.ru", "superjob.ru",
+    "rabota.ru", "zarplata.ru", "avito.ru", "rabota.yandex.ru", "rabota.by", "jobs.dou.ua",
+    "linkedin.com", "indeed.com", "vk.com", "t.me",
+    # агрегаторы и перепосты вакансий (найдены в выдаче)
+    "gorodrabot.ru", "jooble.org", "finder.work", "geekjob.ru", "careerspace.app",
+    "jabka.work", "joba.work", "hirehi.ru", "sobes.tech", "quick-offer.ru", "talent-move.ru",
+    "taylor.kz", "nesiditsa.ru", "pawetta.com", "dreamjob.ru", "deffic.ru", "hitit.one",
+    "vakradar.ru", "remote-job.ru", "rabix.ru", "careerholo.com", "mindpal.co",
+    "jobs.ita.am", "okjobs.co.za", "morocco24x7.com", "is-great.net",
 ]  # fmt: skip
 
 SUMMARY_SCHEMA: dict[str, Any] = {
@@ -80,6 +89,12 @@ SUMMARY_SCHEMA: dict[str, Any] = {
         "requirements": {"type": "string", "description": "требования, кратко"},
         "duties": {"type": "string", "description": "обязанности, кратко"},
         "skills": {"type": "array", "items": {"type": "string"}},
+        "is_employer_page": {
+            "type": "boolean",
+            "description": "true, если вакансию опубликовал сам работодатель: сайт компании, её "
+            "карьерная страница или ATS компании. false для агрегаторов, досок объявлений, "
+            "перепостов и сайтов, где компания не указана",
+        },
     },
     "required": ["is_open_vacancy", "title"],
 }
@@ -197,6 +212,11 @@ def parse_result(
     if not _clean(summary.get("title")):
         return None
     if not allow_closed and not summary.get("is_open_vacancy"):
+        return None
+    # «Сайты компаний»: только страницы самого работодателя с названием компании.
+    # Для вакансий, добавленных вручную (allow_closed), не проверяем — пользователь решил сам.
+    not_employer = summary.get("is_employer_page") is False or not _clean(summary.get("company"))
+    if site is WEB and not allow_closed and not_employer:
         return None
 
     title = re.sub(r"\s+[—-]\s+Хабр Карьера$", "", _clean(summary["title"]))

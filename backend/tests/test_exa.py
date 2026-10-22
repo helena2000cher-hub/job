@@ -76,7 +76,13 @@ def test_parse_web_result_uses_domain_as_source():
     result = {
         "url": "https://www.example-company.ru/careers/analyst",
         "text": "Работа удаленно",
-        "summary": {"is_open_vacancy": True, "title": "Аналитик", "remote": False},
+        "summary": {
+            "is_open_vacancy": True,
+            "title": "Аналитик",
+            "remote": False,
+            "company": "Пример",
+            "is_employer_page": True,
+        },  # fmt: skip
     }
     v = parse_result(result, WEB)
     assert v.source == "example-company.ru"
@@ -163,3 +169,24 @@ def test_currency_from_summary():
     }
     assert parse_result(result, HH).currency == "KZT"
     assert parse_result(HH_RESULT, HH).currency == "RUB"  # по умолчанию
+
+
+@pytest.mark.parametrize(
+    "summary_fields",
+    [
+        {"company": "Агрегатор", "is_employer_page": False},  # перепост на агрегаторе
+        {"is_employer_page": True},  # компания не указана
+    ],
+)
+def test_web_skips_aggregators_and_pages_without_company(summary_fields):
+    result = {"url": "https://jabka.work/jobs/ai-dev", "summary": summary(**summary_fields)}
+    assert parse_result(result, WEB) is None
+    # добавленное вручную сохраняем — пользователь сам решил, что это его отклик
+    assert parse_result(result, WEB, allow_closed=True) is not None
+
+
+def test_known_aggregators_excluded_from_web_search():
+    from app.collectors.exa import AGGREGATORS
+
+    for domain in ["jabka.work", "hirehi.ru", "sobes.tech", "*.hh.kz", "jobs.dou.ua"]:
+        assert domain in AGGREGATORS
