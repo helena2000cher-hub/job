@@ -171,6 +171,23 @@ export interface SentItem {
   notes: string
 }
 
+export interface ManualApplicationIn {
+  url: string
+  title: string
+  company: string
+  stage: Stage
+  applied_at: string | null
+  notes: string
+}
+
+export interface ManualApplicationOut {
+  vacancy_id: string
+  title: string
+  company: string | null
+  fetched: boolean
+  application: Application
+}
+
 export type FeedView = 'all' | 'saved' | 'hidden'
 
 export const OFFLINE_MESSAGE =
@@ -225,6 +242,11 @@ export const api = {
     request<Application>(`/api/applications/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(patch),
+    }),
+  addManualApplication: (body: ManualApplicationIn) =>
+    request<ManualApplicationOut>('/api/applications/manual', {
+      method: 'POST',
+      body: JSON.stringify(body),
     }),
   deleteApplication: (id: string) =>
     fetch(`/api/applications/${encodeURIComponent(id)}`, { method: 'DELETE' }),

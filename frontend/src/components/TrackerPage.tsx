@@ -5,6 +5,8 @@ import { api } from '../api'
 import type { Application, Mark, Stage, TrackerItem } from '../api'
 import { formatDate } from '../format'
 import { STAGES } from '../stages'
+import { useIsDemo } from '../session'
+import { AddApplicationButton } from './AddApplicationDialog'
 import { EmptyState, ScoreBadge, Spinner } from './ui'
 import { VacancyDrawer } from './VacancyDrawer'
 
@@ -13,13 +15,15 @@ export function TrackerPage({ onGoToFeed }: { onGoToFeed: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState<Stage | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const isDemo = useIsDemo()
 
   useEffect(() => {
     api
       .applications()
       .then(setItems)
       .catch((e: Error) => setError(e.message))
-  }, [])
+  }, [reloadKey])
 
   const applyChange = useCallback((id: string, application: Application | null) => {
     setItems((list) =>
@@ -75,11 +79,14 @@ export function TrackerPage({ onGoToFeed }: { onGoToFeed: () => void }) {
             Перетаскивайте карточки между колонками. В карточке — заметки и сопроводительное письмо.
           </p>
         </div>
-        {total > 0 && (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Всего: {total} · отправлено за неделю: {sentThisWeek}
-          </p>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {total > 0 && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Всего: {total} · отправлено за неделю: {sentThisWeek}
+            </p>
+          )}
+          {!isDemo && <AddApplicationButton onAdded={() => setReloadKey((k) => k + 1)} />}
+        </div>
       </div>
 
       {error && (

@@ -3,6 +3,8 @@
 Every request works in a workspace: the owner's (valid session cookie) or the public demo sandbox.
 """
 
+import hashlib
+import logging
 from collections import Counter
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -20,16 +22,19 @@ from app.advice import Advice, generate_advice, load_advice, save_advice
 from app.api.auth import COOKIE_NAME, SESSION_DAYS, Auth
 from app.api.refresh import RefreshJob, RefreshState, Runner, default_runner
 from app.collectors import COLLECTORS
+from app.collectors.exa import fetch_vacancy, identify
 from app.config import DATA_DIR, PROJECT_ROOT, get_settings
 from app.cover_letter import Tone, generate_cover_letter
 from app.db import get_engine, init_db
 from app.demo import DemoResetter
 from app.llm import LLM, PolzaLLM
-from app.models import STAGES, Application, Match, Vacancy, VacancyMark, utcnow
+from app.models import SENT_STAGES, STAGES, Application, Match, Vacancy, VacancyMark, utcnow
 from app.profile import PROFILE_PATH, RESUME_PATH, Profile, build_profile, read_resume, save_profile
 from app.tracker import compute_analytics, mark_no_response
 
 FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
+
+log = logging.getLogger(__name__)
 
 
 class FeedItem(BaseModel):
@@ -118,6 +123,25 @@ class ApplicationIn(BaseModel):
     cover_letter_subject: str | None = None
 
 
+class ManualApplicationIn(BaseModel):
+    """Отклик, отправленный мимо сайта: по ссылке (данные подтянутся) или по названию."""
+
+    url: str = ""
+    title: str = ""
+    company: str = ""
+    stage: Stage = "applied"
+    applied_at: date | None = None
+    notes: str = ""
+
+
+class ManualApplicationOut(BaseModel):
+    vacancy_id: str
+    title: str
+    company: str | None
+    fetched: bool  # данные вакансии подтянуты по ссылке
+    application: ApplicationOut
+
+
 class CoverLetterIn(BaseModel):
     tone: Tone = "business"
     wishes: str = ""
@@ -188,6 +212,7 @@ def create_app(
     serve_frontend: bool = True,
     llm_factory: Callable[[], LLM] = PolzaLLM,
     resume_path: Path = RESUME_PATH,
+    vacancy_fetcher: Callable[[str], Vacancy | None] = fetch_vacancy,
     auth: Auth | None = None,
     demo_engine: Engine | None = None,
     demo_profile_path: Path | None = None,
@@ -373,6 +398,60 @@ def create_app(
         s.commit()
         s.refresh(application)
         return application
+
+    @app.post("/api/applications/manual", response_model=ManualApplicationOut)
+    def add_manual_application(body: ManualApplicationIn, s: SessionDep, ws: OwnerDep):
+        url = body.url.strip()
+        if url and not url.startswith(("http://", "https://")):
+            url = "https://" + url
+        title, company = body.title.strip(), body.company.strip()
+        if not url and not title:
+            raise HTTPException(400, "Вставьте ссылку на вакансию или укажите название")
+
+        ident = identify(url) if url else None
+        vacancy = s.get(Vacancy, ident.id) if ident else None
+        fetched = vacancy is not None
+        if vacancy is None and url:
+            try:
+                vacancy = vacancy_fetcher(url)
+            except Exception as exc:  # сеть, лимиты Exa — не повод терять отклик
+                log.warning("manual: could not fetch %s: %s", url, exc)
+            fetched = vacancy is not None
+        if vacancy is None:
+            if not title:
+                raise HTTPException(
+                    400, "Не удалось загрузить вакансию по ссылке — укажите название вручную"
+                )
+            if ident:
+                vid, source, ext, vurl = ident.id, ident.source, ident.external_id, ident.url
+            else:
+                ext = hashlib.sha1(f"{title}|{company}".lower().encode()).hexdigest()[:16]
+                vid, source, vurl = f"manual:{ext}", "manual", ""
+            vacancy = Vacancy(
+                id=vid, source=source, external_id=ext, title=title,
+                company=company or None, url=vurl,
+            )  # fmt: skip
+        if s.get(Vacancy, vacancy.id) is None:
+            s.add(vacancy)
+
+        application = s.get(Application, vacancy.id) or Application(vacancy_id=vacancy.id)
+        application.stage = body.stage
+        application.applied_at = body.applied_at or application.applied_at
+        if application.applied_at is None and body.stage in SENT_STAGES:
+            application.applied_at = date.today()
+        if body.notes.strip():
+            application.notes = body.notes.strip()
+        application.stage_changed_at = application.updated_at = utcnow()
+        s.add(application)
+        s.commit()
+        s.refresh(application)
+        return ManualApplicationOut(
+            vacancy_id=vacancy.id,
+            title=vacancy.title,
+            company=vacancy.company,
+            fetched=fetched,
+            application=ApplicationOut.model_validate(application, from_attributes=True),
+        )
 
     @app.delete("/api/applications/{vacancy_id}", status_code=204)
     def delete_application(vacancy_id: str, s: SessionDep):

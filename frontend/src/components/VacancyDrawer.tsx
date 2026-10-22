@@ -93,6 +93,7 @@ export function VacancyDrawer({ id, onClose, onMark, onApplicationChange }: Prop
             </header>
 
             <div className="flex flex-wrap gap-2">
+              {vacancy.url && (
               <a
                 href={vacancy.url}
                 target="_blank"
@@ -102,6 +103,7 @@ export function VacancyDrawer({ id, onClose, onMark, onApplicationChange }: Prop
               >
                 Открыть вакансию на сайте <ExternalLink className="h-4 w-4" />
               </a>
+              )}
               <Button variant="ghost" onClick={() => mark(vacancy.mark === 'hidden' ? null : 'hidden')}>
                 {vacancy.mark === 'hidden' ? 'Вернуть в ленту' : 'Скрыть'}
               </Button>

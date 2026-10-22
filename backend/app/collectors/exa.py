@@ -27,6 +27,7 @@ from app.models import Vacancy
 log = logging.getLogger(__name__)
 
 API_URL = "https://api.exa.ai/search"
+CONTENTS_URL = "https://api.exa.ai/contents"
 
 
 @dataclass(frozen=True)
@@ -148,23 +149,54 @@ class ExaCollector(Collector):
         return data.get("results") or []
 
 
-def parse_result(result: dict[str, Any], site: Site) -> Vacancy | None:
-    """Exa result → Vacancy, or None for listings, articles and closed vacancies."""
-    url = result.get("url") or ""
+@dataclass(frozen=True)
+class Identity:
+    id: str
+    source: str
+    external_id: str
+    url: str
+
+
+def identify(url: str, site: Site | None = None) -> Identity | None:
+    """Stable id for a vacancy URL: hh/habr links of any form map to one canonical id."""
+    site = site or site_for_url(url)
     parsed = urlparse(url)
     if site.url_pattern:
         match = site.url_pattern.search(parsed.netloc + parsed.path)
         if not match:
             return None
         external_id = match.group(1)
-        url = site.canonical_url.format(id=external_id) if site.canonical_url else url
-        source = site.name
-    else:
-        external_id = hashlib.sha1(url.encode()).hexdigest()[:16]
-        source = parsed.netloc.removeprefix("www.") or site.name
+        canonical = site.canonical_url.format(id=external_id) if site.canonical_url else url
+        return Identity(f"{site.name}:{external_id}", site.name, external_id, canonical)
+    external_id = hashlib.sha1(url.encode()).hexdigest()[:16]
+    source = parsed.netloc.removeprefix("www.") or site.name
+    return Identity(f"{source}:{external_id}", source, external_id, url)
+
+
+def site_for_url(url: str) -> Site:
+    parsed = urlparse(url)
+    for site in (HH, HABR):
+        if site.url_pattern and site.url_pattern.search(parsed.netloc + parsed.path):
+            return site
+    return WEB
+
+
+def parse_result(
+    result: dict[str, Any], site: Site, *, allow_closed: bool = False
+) -> Vacancy | None:
+    """Exa result → Vacancy, or None for listings, articles and closed vacancies.
+
+    allow_closed — для вакансий, добавленных вручную: после отклика их часто уже закрыли.
+    """
+    ident = identify(result.get("url") or "", site)
+    if ident is None:
+        return None
+    url, source, external_id = ident.url, ident.source, ident.external_id
 
     summary = _parse_summary(result.get("summary"))
-    if not summary.get("is_open_vacancy") or not _clean(summary.get("title")):
+    if not _clean(summary.get("title")):
+        return None
+    if not allow_closed and not summary.get("is_open_vacancy"):
         return None
 
     title = re.sub(r"\s+[—-]\s+Хабр Карьера$", "", _clean(summary["title"]))
@@ -188,7 +220,7 @@ def parse_result(result: dict[str, Any], site: Site) -> Vacancy | None:
         published_at=_parse_date(result.get("publishedDate")),
         raw={"summary": summary, "text": text, "exa_url": result.get("url")},
     )
-    if text and _ARCHIVED.search(text):
+    if not allow_closed and text and _ARCHIVED.search(text):
         return None  # модель иногда пропускает плашку «Вакансия в архиве»
     vacancy.is_remote = _is_remote(summary, vacancy, text)
     return vacancy
@@ -251,3 +283,29 @@ def _parse_date(value: Any) -> date | None:
         return date.fromisoformat(str(value)[:10]) if value else None
     except ValueError:
         return None
+
+
+def fetch_vacancy(url: str, client: httpx.Client | None = None) -> Vacancy | None:
+    """Load one vacancy page by URL via Exa /contents (hh.ru blocks direct requests).
+
+    Returns None if Exa can't read the page or it isn't a vacancy. Cost ≈ $0.002.
+    """
+    api_key = get_settings().exa_api_key
+    if client is None:
+        if not api_key:
+            return None
+        client = httpx.Client(timeout=60, headers={"x-api-key": api_key})
+    response = client.post(
+        CONTENTS_URL,
+        json={
+            "urls": [url],
+            "text": {"maxCharacters": 4000},
+            "summary": {"schema": SUMMARY_SCHEMA},
+        },
+    )
+    response.raise_for_status()
+    results = response.json().get("results") or []
+    if not results:
+        return None
+    result = {**results[0], "url": url}  # Exa может вернуть адрес без меток — сохраняем исходный
+    return parse_result(result, site_for_url(url), allow_closed=True)

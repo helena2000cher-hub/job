@@ -6,6 +6,7 @@ import type { Advice, Analytics, RateRow, SentItem, Stage } from '../api'
 import { formatDate, formatDateTime, sourceLabel } from '../format'
 import { useIsDemo } from '../session'
 import { STAGES } from '../stages'
+import { AddApplicationButton } from './AddApplicationDialog'
 import { Button, EmptyState, Spinner } from './ui'
 import { VacancyDrawer } from './VacancyDrawer'
 
@@ -16,6 +17,7 @@ export function AnalyticsPage({ onGoToFeed }: { onGoToFeed: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const isDemo = useIsDemo()
 
   useEffect(() => {
     api
@@ -64,7 +66,13 @@ export function AnalyticsPage({ onGoToFeed }: { onGoToFeed: () => void }) {
           <button type="button" className="text-indigo-600 underline dark:text-indigo-400" onClick={onGoToFeed}>
             ленте
           </button>
-          , перейдите на сайт и ответьте «Да, отправлен» — здесь появится статистика.
+          , перейдите на сайт и ответьте «Да, отправлен» — здесь появится статистика. Откликались напрямую
+          на hh.ru? Добавьте такой отклик вручную.
+          {!isDemo && (
+            <div className="mt-4">
+              <AddApplicationButton variant="primary" onAdded={reload} />
+            </div>
+          )}
         </EmptyState>
       ) : (
         <>
@@ -84,7 +92,10 @@ export function AnalyticsPage({ onGoToFeed }: { onGoToFeed: () => void }) {
             </p>
           )}
 
-          <Panel title={`Мои отклики (${data.sent_list.length})`}>
+          <Panel
+            title={`Мои отклики (${data.sent_list.length})`}
+            action={!isDemo && <AddApplicationButton onAdded={reload} />}
+          >
             <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
               Пришёл ответ, прислали анкету или тестовое, позвали на собеседование — поменяйте этап, статистика
               обновится. Нажмите на название, чтобы открыть вакансию, письмо и заметки.
@@ -191,6 +202,7 @@ function SentList({
           </select>
           <span className="flex w-16 items-center justify-end gap-1 text-slate-400">
             {item.has_letter && <Mail className="h-4 w-4" aria-label="Есть сопроводительное письмо" />}
+            {item.url && (
             <a
               href={item.url}
               target="_blank"
@@ -201,6 +213,7 @@ function SentList({
             >
               <ExternalLink className="h-4 w-4" />
             </a>
+            )}
           </span>
         </li>
       ))}
@@ -227,10 +240,13 @@ function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: 
   )
 }
 
-function Panel({ title, children }: { title: string; children: ReactNode }) {
+function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h2>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h2>
+        {action}
+      </div>
       {children}
     </section>
   )
