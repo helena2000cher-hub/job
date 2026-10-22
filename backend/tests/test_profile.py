@@ -48,3 +48,11 @@ def test_extra_skills_reach_matching_text():
     assert "Дополнительно" not in profile.matching_text()
     profile.extra = "Make, Google Таблицы"
     assert "Дополнительно (нет в резюме): Make, Google Таблицы" in profile.matching_text()
+
+
+def test_name_does_not_affect_fingerprint_or_llm_text():
+    profile = Profile(headline="Аналитик", target_roles=["Аналитик"], skills=["SQL"])
+    before = profile.fingerprint()
+    profile.name = "Елена"
+    assert profile.fingerprint() == before  # смена имени не сбрасывает оценки
+    assert "Елена" not in profile.matching_text()  # имя не уходит в нейросеть

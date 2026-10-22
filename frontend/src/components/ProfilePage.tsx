@@ -108,6 +108,15 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
 
       <fieldset disabled={isDemo} className="space-y-6 disabled:opacity-90">
       <Card title="Кто я">
+        <Field label="Как к вам обращаться" hint="Показывается в шапке сайта. Нейросети не передаётся.">
+          <input
+            className={`${INPUT} max-w-xs`}
+            value={profile.name ?? ''}
+            placeholder="Имя"
+            autoComplete="given-name"
+            onChange={(e) => set('name', e.target.value)}
+          />
+        </Field>
         <Field label="Желаемая должность">
           <input className={INPUT} value={profile.headline} onChange={(e) => set('headline', e.target.value)} />
         </Field>

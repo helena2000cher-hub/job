@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, LogIn, LogOut, Moon, Sun } from 'lucide-react'
+import { BriefcaseBusiness, Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ApiError, api } from './api'
 import type { Me } from './api'
@@ -8,6 +8,7 @@ import { LoginPage } from './components/LoginPage'
 import { ProfilePage } from './components/ProfilePage'
 import { RefreshButton } from './components/RefreshButton'
 import { TrackerPage } from './components/TrackerPage'
+import { UserMenu } from './components/UserMenu'
 import { Spinner } from './components/ui'
 import { SessionContext } from './session'
 
@@ -17,7 +18,6 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'feed', label: 'Вакансии' },
   { id: 'tracker', label: 'Отклики' },
   { id: 'analytics', label: 'Аналитика' },
-  { id: 'profile', label: 'Профиль' },
 ]
 
 function tabFromHash(): Tab {
@@ -33,6 +33,8 @@ export default function App() {
   const [reloadKey, setReloadKey] = useState(0)
   const [dark, toggleDark] = useTheme()
   const [session, setSession] = useState<SessionState>({ status: 'loading' })
+  const [person, setPerson] = useState({ name: '', headline: '' })
+  const [profileKey, setProfileKey] = useState(0) // +1 после сохранения профиля — обновить шапку
 
   useEffect(() => {
     const onHash = () => setTab(tabFromHash())
@@ -50,6 +52,15 @@ export default function App() {
         ),
       )
   }, [])
+
+  const ready = session.status === 'ready'
+  useEffect(() => {
+    if (!ready) return
+    api
+      .profile()
+      .then((p) => setPerson({ name: p.name ?? '', headline: p.headline }))
+      .catch(() => setPerson({ name: '', headline: '' })) // профиля ещё нет — кружок без буквы
+  }, [ready, profileKey])
 
   const go = (next: Tab) => {
     window.location.hash = `#/${next}`
@@ -108,27 +119,17 @@ export default function App() {
                 {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </button>
               {me?.role === 'owner' && <RefreshButton onDone={() => setReloadKey((k) => k + 1)} />}
-              {me?.role === 'owner' && me.auth_enabled && (
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                  aria-label="Выйти"
-                  title="Выйти"
-                >
-                  <LogOut className="h-5 w-5" />
-                </button>
-              )}
-              {isDemo && tab !== 'login' && (
-                <button
-                  type="button"
-                  onClick={() => go('login')}
-                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                  aria-label="Войти"
-                  title="Войти"
-                >
-                  <LogIn className="h-5 w-5" />
-                </button>
+              {me && (
+                <UserMenu
+                  name={person.name}
+                  headline={person.headline}
+                  isDemo={isDemo}
+                  canLogout={me.role === 'owner' && me.auth_enabled}
+                  active={tab === 'profile'}
+                  onProfile={() => go('profile')}
+                  onLogin={() => go('login')}
+                  onLogout={logout}
+                />
               )}
             </div>
           </div>
@@ -170,7 +171,14 @@ export default function App() {
               {tab === 'feed' && <FeedPage reloadKey={reloadKey} onGoToProfile={() => go('profile')} />}
               {tab === 'tracker' && <TrackerPage onGoToFeed={() => go('feed')} />}
               {tab === 'analytics' && <AnalyticsPage onGoToFeed={() => go('feed')} />}
-              {tab === 'profile' && <ProfilePage onSaved={() => setReloadKey((k) => k + 1)} />}
+              {tab === 'profile' && (
+                <ProfilePage
+                  onSaved={() => {
+                    setReloadKey((k) => k + 1)
+                    setProfileKey((k) => k + 1)
+                  }}
+                />
+              )}
             </>
           )}
         </main>

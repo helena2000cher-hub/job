@@ -31,6 +31,7 @@ class Preferences(BaseModel):
 
 
 class Profile(BaseModel):
+    name: str = Field(default="", description="имя для шапки сайта; в нейросеть не передаётся")
     headline: str
     target_roles: list[str]
     skills: list[str]
@@ -58,7 +59,9 @@ class Profile(BaseModel):
 
     def fingerprint(self) -> str:
         """Changes whenever the profile changes — cached match scores are then recomputed."""
-        return hashlib.sha256(self.model_dump_json().encode()).hexdigest()[:16]
+        # Имя на подбор не влияет — его смена не должна сбрасывать оценки вакансий
+        data = self.model_dump_json(exclude={"name"})
+        return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 
 SYSTEM_PROMPT = """Ты — опытный IT-рекрутер.
@@ -134,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     profile = build_profile(read_resume(args.resume), PolzaLLM())
     if PROFILE_PATH.exists() and not args.reset_preferences:
         old = load_profile()
-        profile.preferences, profile.extra = old.preferences, old.extra
+        profile.preferences, profile.extra, profile.name = old.preferences, old.extra, old.name
     save_profile(profile)
 
     print(f"Профиль сохранён: {PROFILE_PATH}")

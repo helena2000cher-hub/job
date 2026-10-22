@@ -97,7 +97,14 @@ class MarkIn(BaseModel):
 
 
 Stage = Literal[
-    "interesting", "applied", "no_response", "test_task", "interview", "offer", "rejected"
+    "interesting",
+    "applied",
+    "no_response",
+    "questionnaire",
+    "test_task",
+    "interview",
+    "offer",
+    "rejected",
 ]
 assert set(Stage.__args__) == set(STAGES)
 
@@ -420,7 +427,8 @@ def create_app(
         old = current_profile(ws)
         profile = build_profile(read_resume(ws.resume_path), llm_factory())
         if old:
-            profile.preferences, profile.extra = old.preferences, old.extra  # ручное не теряем
+            # ручное не теряем: настройки, «что ещё умею», имя
+            profile.preferences, profile.extra, profile.name = old.preferences, old.extra, old.name
         save_profile(profile, ws.profile_path)
         return profile
 

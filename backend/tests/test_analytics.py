@@ -236,3 +236,14 @@ def test_test_task_stage_accepted_by_api(client):
         s.commit()
     r = client.put("/api/applications/test:1", json={"stage": "test_task"})
     assert r.status_code == 200 and r.json()["stage"] == "test_task"
+
+
+def test_questionnaire_is_separate_stage_and_counts_as_response(session):
+    add_app(session, 1, "questionnaire", 4)
+    add_app(session, 2, "test_task", 4)
+    add_app(session, 3, "applied", 4)
+
+    stats = compute_analytics(session, None, TODAY)
+
+    assert stats["stages"]["questionnaire"] == 1 and stats["stages"]["test_task"] == 1
+    assert stats["positive"] == 2  # анкета и тестовое — ответ работодателя

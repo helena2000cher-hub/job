@@ -70,7 +70,7 @@ export function AnalyticsPage({ onGoToFeed }: { onGoToFeed: () => void }) {
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <Stat label="Отправлено" value={data.sent} />
-            <Stat label="Приглашений" value={data.positive} hint="тестовое, собеседование, оффер" />
+            <Stat label="Приглашений" value={data.positive} hint="анкета, тестовое, собеседование, оффер" />
             <Stat label="Доля приглашений" value={rate} />
             <Stat label="Ждут ответа" value={data.waiting} />
             <Stat label="Без ответа" value={data.no_response} />
@@ -86,7 +86,7 @@ export function AnalyticsPage({ onGoToFeed }: { onGoToFeed: () => void }) {
 
           <Panel title={`Мои отклики (${data.sent_list.length})`}>
             <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-              Пришёл ответ, прислали тестовое или позвали на собеседование — поменяйте этап, статистика
+              Пришёл ответ, прислали анкету или тестовое, позвали на собеседование — поменяйте этап, статистика
               обновится. Нажмите на название, чтобы открыть вакансию, письмо и заметки.
             </p>
             <SentList items={data.sent_list} onOpen={setOpenId} onStage={changeStage} />

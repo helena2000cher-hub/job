@@ -6,6 +6,7 @@ export type Stage =
   | 'interesting'
   | 'applied'
   | 'no_response'
+  | 'questionnaire'
   | 'test_task'
   | 'interview'
   | 'offer'
@@ -82,6 +83,7 @@ export interface Preferences {
 }
 
 export interface Profile {
+  name: string
   headline: string
   target_roles: string[]
   skills: string[]
