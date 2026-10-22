@@ -13,6 +13,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from app.careers import CareerSuggestions
 from app.config import DATA_DIR
 from app.llm import LLM, PolzaLLM
 
@@ -43,6 +44,9 @@ class Profile(BaseModel):
     extra: str = Field(default="", description="что умею, но нет в резюме — пишется вручную")
     search_queries: list[str] = Field(default_factory=list, description="запросы для сбора")
     preferences: Preferences = Field(default_factory=Preferences)
+    careers: CareerSuggestions | None = Field(
+        default=None, description="профессии, подобранные по навыкам"
+    )
 
     def matching_text(self) -> str:
         """Compact description used for embeddings and as LLM context."""
@@ -59,8 +63,8 @@ class Profile(BaseModel):
 
     def fingerprint(self) -> str:
         """Changes whenever the profile changes — cached match scores are then recomputed."""
-        # Имя на подбор не влияет — его смена не должна сбрасывать оценки вакансий
-        data = self.model_dump_json(exclude={"name"})
+        # Имя и подсказки профессий на оценку не влияют — их смена не сбрасывает оценки
+        data = self.model_dump_json(exclude={"name", "careers"})
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 
@@ -119,7 +123,9 @@ def load_profile(path: Path = PROFILE_PATH) -> Profile:
 
 def save_profile(profile: Profile, path: Path = PROFILE_PATH) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(profile.model_dump(), ensure_ascii=False, indent=2), "utf-8")
+    path.write_text(
+        json.dumps(profile.model_dump(mode="json"), ensure_ascii=False, indent=2), "utf-8"
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -138,6 +144,7 @@ def main(argv: list[str] | None = None) -> int:
     if PROFILE_PATH.exists() and not args.reset_preferences:
         old = load_profile()
         profile.preferences, profile.extra, profile.name = old.preferences, old.extra, old.name
+        profile.careers = old.careers
     save_profile(profile)
 
     print(f"Профиль сохранён: {PROFILE_PATH}")

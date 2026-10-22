@@ -2,15 +2,16 @@ import { FileText, Plus, Save, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { api } from '../api'
-import type { Profile } from '../api'
+import type { CareerOption, Profile } from '../api'
 import { useIsDemo } from '../session'
+import { CareerExplorer } from './CareerExplorer'
 import { Button, EmptyState, Spinner } from './ui'
 
 export function ProfilePage({ onSaved }: { onSaved: () => void }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [saved, setSaved] = useState<string>('') // JSON последней сохранённой версии
   const [status, setStatus] = useState<'loading' | 'missing' | 'ready'>('loading')
-  const [busy, setBusy] = useState<'save' | 'rebuild' | null>(null)
+  const [busy, setBusy] = useState<'save' | 'rebuild' | 'careers' | null>(null)
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
   const isDemo = useIsDemo()
 
@@ -59,6 +60,39 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
     }
   }
 
+  const suggestCareers = async () => {
+    setBusy('careers')
+    setMessage(null)
+    try {
+      load(await api.suggestCareers())
+    } catch (e) {
+      setMessage({ tone: 'error', text: (e as Error).message })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // «Искать эту работу»: профессия попадает в выбранные, её запросы — в поиск; повторно — убираем
+  const toggleCareer = (option: CareerOption) => {
+    if (!profile) return
+    const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+    const chosen = profile.target_roles.some((r) => same(r, option.title))
+    if (chosen) {
+      const roles = profile.target_roles.filter((r) => !same(r, option.title))
+      const stillNeeded = (profile.careers?.options ?? [])
+        .filter((o) => roles.some((r) => same(r, o.title)))
+        .flatMap((o) => o.queries)
+      const queries = profile.search_queries.filter(
+        (q) => !option.queries.some((x) => same(x, q)) || stillNeeded.some((x) => same(x, q)),
+      )
+      setProfile({ ...profile, target_roles: roles, search_queries: queries })
+    } else {
+      const queries = [...profile.search_queries]
+      for (const q of option.queries) if (!queries.some((x) => same(x, q))) queries.push(q)
+      setProfile({ ...profile, target_roles: [...profile.target_roles, option.title], search_queries: queries })
+    }
+  }
+
   if (status === 'loading') {
     return (
       <div className="flex justify-center py-20 text-slate-400">
@@ -89,7 +123,7 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
         <div>
           <h1 className="text-2xl font-semibold">Профиль</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            По нему подбираются и оцениваются вакансии. Всё можно поправить вручную.
+            Всё начинается с навыков: по ним подбираются профессии, а по выбранным профессиям — вакансии.
           </p>
         </div>
         {!isDemo && (
@@ -107,59 +141,13 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
       )}
 
       <fieldset disabled={isDemo} className="space-y-6 disabled:opacity-90">
-      <Card title="Кто я">
-        <Field label="Как к вам обращаться" hint="Показывается в шапке сайта. Нейросети не передаётся.">
-          <input
-            className={`${INPUT} max-w-xs`}
-            value={profile.name ?? ''}
-            placeholder="Имя"
-            autoComplete="given-name"
-            onChange={(e) => set('name', e.target.value)}
-          />
-        </Field>
-        <Field label="Желаемая должность">
-          <input className={INPUT} value={profile.headline} onChange={(e) => set('headline', e.target.value)} />
-        </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Опыт, лет">
-            <input
-              type="number"
-              min={0}
-              step={0.5}
-              className={INPUT}
-              value={profile.experience_years ?? ''}
-              onChange={(e) => set('experience_years', e.target.value === '' ? null : Number(e.target.value))}
-            />
-          </Field>
-          <Field label="Уровень">
-            <select className={INPUT} value={profile.seniority ?? ''} onChange={(e) => set('seniority', e.target.value || null)}>
-              <option value="">не указан</option>
-              <option value="junior">Junior</option>
-              <option value="middle">Middle</option>
-              <option value="senior">Senior</option>
-            </select>
-          </Field>
-        </div>
-        <Field label="О себе (это видит нейросеть при оценке)">
-          <textarea
-            rows={3}
-            className={INPUT}
-            value={profile.summary}
-            onChange={(e) => set('summary', e.target.value)}
-          />
-        </Field>
-      </Card>
-
-      <Card title="Роли и навыки">
-        <Field label="Целевые роли">
-          <TagEditor values={profile.target_roles} onChange={(v) => set('target_roles', v)} placeholder="Добавить роль" />
-        </Field>
-        <Field label={`Навыки (${profile.skills.length})`}>
+      <Card title="Мои навыки" subtitle="Главное в профиле: по навыкам подбираются профессии, вакансии и письма.">
+        <Field label={`Навыки (${profile.skills.length})`} hint="Добавляйте всё, что умеете: инструменты, методики, языки, предметные знания.">
           <TagEditor values={profile.skills} onChange={(v) => set('skills', v)} placeholder="Добавить навык" />
         </Field>
         <Field
           label="Что ещё умею (нет в резюме)"
-          hint="Учитывается при оценке вакансий и в сопроводительных письмах. Пишите как есть: где применяли, на каком уровне."
+          hint="Своими словами: где применяли и на каком уровне. Учитывается при подборе профессий, оценке вакансий и в письмах."
         >
           <textarea
             rows={3}
@@ -170,9 +158,32 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
           />
         </Field>
       </Card>
+      </fieldset>
 
-      <Card title="Что и где искать">
-        <Field label="Поисковые запросы" hint="По ним ищутся вакансии при «Найти вакансии»">
+      <CareerExplorer
+        careers={profile.careers}
+        skills={profile.skills}
+        extra={profile.extra ?? ''}
+        selected={profile.target_roles}
+        busy={busy === 'careers'}
+        disabled={isDemo || dirty}
+        disabledHint={
+          isDemo
+            ? 'В демо подбор недоступен — это платный вызов нейросети.'
+            : dirty
+              ? 'Сохраните изменения, чтобы подбор учёл новые навыки.'
+              : undefined
+        }
+        onGenerate={suggestCareers}
+        onToggle={toggleCareer}
+      />
+
+      <fieldset disabled={isDemo} className="space-y-6 disabled:opacity-90">
+      <Card title="Что и где искать" subtitle="Выбранные профессии и запросы, по которым «Найти вакансии» собирает вакансии.">
+        <Field label="Выбранные профессии" hint="Добавляются кнопкой «Искать эту работу» выше или вручную.">
+          <TagEditor values={profile.target_roles} onChange={(v) => set('target_roles', v)} placeholder="Добавить профессию" />
+        </Field>
+        <Field label="Поисковые запросы" hint="Короткие, 1–3 слова — как вводили бы на hh.ru">
           <TagEditor values={profile.search_queries} onChange={(v) => set('search_queries', v)} placeholder="Добавить запрос" />
         </Field>
         <label className="flex items-center gap-3">
@@ -204,6 +215,48 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
         </Field>
       </Card>
 
+      <Card title="Обо мне" subtitle="Контекст для оценки вакансий и писем.">
+        <Field label="Как к вам обращаться" hint="Показывается в шапке сайта. Нейросети не передаётся.">
+          <input
+            className={`${INPUT} max-w-xs`}
+            value={profile.name ?? ''}
+            placeholder="Имя"
+            autoComplete="given-name"
+            onChange={(e) => set('name', e.target.value)}
+          />
+        </Field>
+        <Field label="Кратко о себе одной строкой" hint="Используется в письмах и в меню профиля, например: «Аналитик и AI-разработчик»">
+          <input className={INPUT} value={profile.headline} onChange={(e) => set('headline', e.target.value)} />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Опыт, лет">
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              className={INPUT}
+              value={profile.experience_years ?? ''}
+              onChange={(e) => set('experience_years', e.target.value === '' ? null : Number(e.target.value))}
+            />
+          </Field>
+          <Field label="Уровень">
+            <select className={INPUT} value={profile.seniority ?? ''} onChange={(e) => set('seniority', e.target.value || null)}>
+              <option value="">не указан</option>
+              <option value="junior">Junior</option>
+              <option value="middle">Middle</option>
+              <option value="senior">Senior</option>
+            </select>
+          </Field>
+        </div>
+        <Field label="О себе (это видит нейросеть при оценке)">
+          <textarea
+            rows={3}
+            className={INPUT}
+            value={profile.summary}
+            onChange={(e) => set('summary', e.target.value)}
+          />
+        </Field>
+      </Card>
       </fieldset>
 
       {message && (
@@ -238,10 +291,13 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
 const INPUT =
   'w-full rounded-lg border-0 bg-white px-3 py-2 text-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 dark:bg-slate-950 dark:ring-slate-700'
 
-function Card({ title, children }: { title: string; children: ReactNode }) {
+function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="font-semibold">{title}</h2>
+      <div>
+        <h2 className="font-semibold">{title}</h2>
+        {subtitle && <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
+      </div>
       {children}
     </section>
   )

@@ -82,6 +82,26 @@ export interface Preferences {
   stop_words: string[]
 }
 
+export type CareerKind = 'core' | 'adjacent' | 'new_field'
+
+export interface CareerOption {
+  title: string
+  field: string
+  kind: CareerKind
+  fit: number
+  why: string
+  transferable: string[]
+  gaps: string[]
+  queries: string[]
+}
+
+export interface CareerSuggestions {
+  options: CareerOption[]
+  generated_at: string
+  skills_snapshot: string[]
+  extra_snapshot: string
+}
+
 export interface Profile {
   name: string
   headline: string
@@ -95,6 +115,7 @@ export interface Profile {
   extra: string
   search_queries: string[]
   preferences: Preferences
+  careers: CareerSuggestions | null
 }
 
 export interface RefreshState {
@@ -260,6 +281,7 @@ export const api = {
   profile: () => request<Profile>('/api/profile'),
   saveProfile: (profile: Profile) =>
     request<Profile>('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }),
+  suggestCareers: () => request<Profile>('/api/profile/careers', { method: 'POST' }),
   rebuildProfile: () => request<Profile>('/api/profile/rebuild', { method: 'POST' }),
   refreshStatus: () => request<RefreshState>('/api/refresh'),
   refresh: (sources: string[]) =>

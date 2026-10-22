@@ -21,6 +21,7 @@ from sqlmodel import Session, create_engine, func, select
 from app.advice import Advice, generate_advice, load_advice, save_advice
 from app.api.auth import COOKIE_NAME, SESSION_DAYS, Auth
 from app.api.refresh import RefreshJob, RefreshState, Runner, default_runner
+from app.careers import suggest_careers
 from app.collectors import COLLECTORS
 from app.collectors.exa import fetch_vacancy, identify
 from app.config import DATA_DIR, PROJECT_ROOT, get_settings
@@ -499,6 +500,25 @@ def create_app(
         save_profile(profile, ws.profile_path)
         return profile
 
+    @app.post("/api/profile/careers", response_model=Profile)
+    def careers(ws: OwnerDep):
+        """Подобрать профессии по навыкам (≈ 0,05 ₽). Результат сохраняется в профиле."""
+        profile = current_profile(ws)
+        if profile is None:
+            raise HTTPException(400, "Сначала создайте профиль")
+        try:
+            profile.careers = suggest_careers(
+                profile.skills,
+                profile.extra,
+                profile.experience_years,
+                profile.industries,
+                llm_factory(),
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        save_profile(profile, ws.profile_path)
+        return profile
+
     @app.post("/api/profile/rebuild", response_model=Profile)
     def rebuild_profile(ws: OwnerDep):
         if not ws.resume_path.exists():
@@ -508,6 +528,7 @@ def create_app(
         if old:
             # ручное не теряем: настройки, «что ещё умею», имя
             profile.preferences, profile.extra, profile.name = old.preferences, old.extra, old.name
+            profile.careers = old.careers
         save_profile(profile, ws.profile_path)
         return profile
 

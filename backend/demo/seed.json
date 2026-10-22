@@ -56,6 +56,146 @@
         "курьер",
         "холодные звонки"
       ]
+    },
+    "careers": {
+      "generated_at": "2026-10-20T09:00:00Z",
+      "skills_snapshot": [
+        "SQL",
+        "Python",
+        "pandas",
+        "BPMN",
+        "User Stories",
+        "ТЗ/SRS",
+        "Jira",
+        "Confluence",
+        "A/B-тесты",
+        "Продуктовые метрики",
+        "Power BI",
+        "REST API",
+        "Postman",
+        "Excel",
+        "Сбор требований",
+        "Анализ требований",
+        "Figma (прототипы)",
+        "Git"
+      ],
+      "extra_snapshot": "",
+      "options": [
+        {
+          "title": "Продуктовый аналитик",
+          "field": "IT-продукты",
+          "kind": "core",
+          "fit": 90,
+          "why": "SQL, Python, A/B-тесты и продуктовые метрики — ядро роли.",
+          "transferable": [
+            "SQL",
+            "Python",
+            "A/B-тесты",
+            "Продуктовые метрики"
+          ],
+          "gaps": [
+            "Amplitude"
+          ],
+          "queries": [
+            "продуктовый аналитик",
+            "product analyst"
+          ]
+        },
+        {
+          "title": "Бизнес-аналитик",
+          "field": "IT",
+          "kind": "core",
+          "fit": 86,
+          "why": "Сбор требований, BPMN и User Stories закрывают основные задачи.",
+          "transferable": [
+            "BPMN",
+            "User Stories",
+            "ТЗ/SRS",
+            "Jira"
+          ],
+          "gaps": [],
+          "queries": [
+            "бизнес-аналитик"
+          ]
+        },
+        {
+          "title": "Системный аналитик",
+          "field": "IT",
+          "kind": "adjacent",
+          "fit": 72,
+          "why": "Опыт с REST API и требованиями переносится, нужно подтянуть UML.",
+          "transferable": [
+            "REST API",
+            "Postman",
+            "Анализ требований"
+          ],
+          "gaps": [
+            "UML",
+            "Kafka"
+          ],
+          "queries": [
+            "системный аналитик"
+          ]
+        },
+        {
+          "title": "Аналитик данных",
+          "field": "Данные",
+          "kind": "adjacent",
+          "fit": 70,
+          "why": "Python, pandas и Power BI — основа отчётности и исследований.",
+          "transferable": [
+            "Python",
+            "pandas",
+            "Power BI",
+            "SQL"
+          ],
+          "gaps": [
+            "Статистика"
+          ],
+          "queries": [
+            "аналитик данных"
+          ]
+        },
+        {
+          "title": "Маркетинговый аналитик",
+          "field": "Маркетинг",
+          "kind": "new_field",
+          "fit": 58,
+          "why": "Воронки, A/B-тесты и SQL ценятся в performance-маркетинге.",
+          "transferable": [
+            "A/B-тесты",
+            "SQL",
+            "Продуктовые метрики"
+          ],
+          "gaps": [
+            "Яндекс Метрика",
+            "Юнит-экономика"
+          ],
+          "queries": [
+            "маркетинговый аналитик",
+            "веб-аналитик"
+          ]
+        },
+        {
+          "title": "Аналитик в финтехе (риски)",
+          "field": "Финансы",
+          "kind": "new_field",
+          "fit": 52,
+          "why": "Опыт в финтехе и работа с данными помогают в анализе рисков.",
+          "transferable": [
+            "SQL",
+            "Python",
+            "Excel"
+          ],
+          "gaps": [
+            "Скоринг",
+            "Регуляторика"
+          ],
+          "queries": [
+            "аналитик рисков"
+          ]
+        }
+      ]
     }
   },
   "vacancies": [
