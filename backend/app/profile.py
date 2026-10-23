@@ -42,6 +42,11 @@ class Profile(BaseModel):
     education: str | None = None
     summary: str = ""
     extra: str = Field(default="", description="что умею, но нет в резюме — пишется вручную")
+    stories: str = Field(
+        default="", description="истории и достижения для сопроводительных писем (факты, цифры)"
+    )
+    full_name: str = Field(default="", description="подпись письма; в нейросеть не передаётся")
+    contacts: str = Field(default="", description="контакты в подписи; в нейросеть не передаются")
     search_queries: list[str] = Field(default_factory=list, description="запросы для сбора")
     preferences: Preferences = Field(default_factory=Preferences)
     careers: CareerSuggestions | None = Field(
@@ -85,8 +90,9 @@ class Profile(BaseModel):
 
     def fingerprint(self) -> str:
         """Changes whenever the profile changes — cached match scores are then recomputed."""
-        # Имя и подсказки профессий на оценку не влияют — их смена не сбрасывает оценки
-        data = self.model_dump_json(exclude={"name", "careers"})
+        # Имя, подпись, истории для писем и подсказки профессий на оценку вакансий не влияют —
+        # их правка не должна сбрасывать оценки
+        data = self.model_dump_json(exclude={"name", "full_name", "contacts", "stories", "careers"})
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 
@@ -171,6 +177,11 @@ def main(argv: list[str] | None = None) -> int:
         old = load_profile()
         profile.preferences, profile.extra, profile.name = old.preferences, old.extra, old.name
         profile.careers = old.careers
+        profile.stories, profile.full_name, profile.contacts = (
+            old.stories,
+            old.full_name,
+            old.contacts,
+        )
     save_profile(profile)
 
     print(f"Профиль сохранён: {PROFILE_PATH}")

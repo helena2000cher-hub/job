@@ -113,6 +113,9 @@ export interface Profile {
   education: string | null
   summary: string
   extra: string
+  stories: string
+  full_name: string
+  contacts: string
   search_queries: string[]
   preferences: Preferences
   careers: CareerSuggestions | null
@@ -271,10 +274,10 @@ export const api = {
     }),
   deleteApplication: (id: string) =>
     fetch(`/api/applications/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  coverLetter: (id: string, tone: Tone, wishes: string) =>
+  coverLetter: (id: string, tone: Tone, wishes: string, mentionGaps = true) =>
     request<Application>(`/api/applications/${encodeURIComponent(id)}/cover-letter`, {
       method: 'POST',
-      body: JSON.stringify({ tone, wishes }),
+      body: JSON.stringify({ tone, wishes, mention_gaps: mentionGaps }),
     }),
   analytics: () => request<Analytics>('/api/analytics'),
   makeAdvice: () => request<Advice>('/api/analytics/advice', { method: 'POST' }),

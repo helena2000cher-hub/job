@@ -201,6 +201,43 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
         </Field>
       </Card>
 
+      <Card
+        title="Для сопроводительных писем"
+        subtitle="Из этого нейросеть собирает пункты «Что уже сделано на практике». Чем конкретнее — тем сильнее письмо."
+      >
+        <Field
+          label="Истории и достижения"
+          hint="Проекты с цифрами, случаи, где вы нашли ошибку или улучшили процесс, принципы работы. Каждую историю — с новой строки. Берутся только отсюда, из резюме и «Что ещё умею»: нейросеть ничего не выдумывает."
+        >
+          <textarea
+            rows={7}
+            className={`${INPUT} leading-relaxed`}
+            value={profile.stories ?? ''}
+            placeholder={'Например:\n• Заметила, что метрика качества прогнозов завышена, и переделала оценку на сравнение со случайным выбором.\n• На приёмке ИИ-куратора нашла критичные баги, команда исправила их до сдачи.'}
+            onChange={(e) => set('stories', e.target.value)}
+          />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Подпись: имя и фамилия" hint="Добавляется в конец письма. Нейросети не передаётся.">
+            <input
+              className={INPUT}
+              value={profile.full_name ?? ''}
+              placeholder="Имя Фамилия"
+              autoComplete="name"
+              onChange={(e) => set('full_name', e.target.value)}
+            />
+          </Field>
+          <Field label="Подпись: контакты" hint="Телефон, Telegram, почта. Нейросети не передаются.">
+            <input
+              className={INPUT}
+              value={profile.contacts ?? ''}
+              placeholder="+7 …, Telegram @…"
+              onChange={(e) => set('contacts', e.target.value)}
+            />
+          </Field>
+        </div>
+      </Card>
+
       <Card title="Обо мне" subtitle="Контекст для оценки вакансий и писем.">
         <Field label="Как к вам обращаться" hint="Показывается в шапке сайта. Нейросети не передаётся.">
           <input

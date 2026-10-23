@@ -118,6 +118,7 @@ export function ApplicationPanel({ vacancyId, application, onChange }: Props) {
 export function CoverLetter({ vacancyId, application, onChange }: Props) {
   const [tone, setTone] = useState<Tone>('business')
   const [wishes, setWishes] = useState('')
+  const [mentionGaps, setMentionGaps] = useState(true)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -128,7 +129,7 @@ export function CoverLetter({ vacancyId, application, onChange }: Props) {
     setBusy(true)
     setError(null)
     try {
-      onChange(await api.coverLetter(vacancyId, tone, wishes))
+      onChange(await api.coverLetter(vacancyId, tone, wishes, mentionGaps))
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -191,6 +192,20 @@ export function CoverLetter({ vacancyId, application, onChange }: Props) {
             className={`${INPUT} min-w-[12rem] flex-1`}
           />
         </div>
+        <label className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={mentionGaps}
+            onChange={(e) => setMentionGaps(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-indigo-600"
+          />
+          <span>
+            Блок «Честно о пробелах»
+            <span className="block text-xs text-slate-500 dark:text-slate-400">
+              1–3 недостающих навыка — у каждого рядом сильная сторона или как вы его закроете
+            </span>
+          </span>
+        </label>
         <Button
           variant={letter ? 'secondary' : 'primary'}
           onClick={generate}

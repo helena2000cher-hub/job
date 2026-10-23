@@ -146,6 +146,7 @@ class ManualApplicationOut(BaseModel):
 class CoverLetterIn(BaseModel):
     tone: Tone = "business"
     wishes: str = ""
+    mention_gaps: bool = True  # блок «Честно о пробелах» — каждый пробел вместе с плюсом
 
 
 class LoginIn(BaseModel):
@@ -477,6 +478,7 @@ def create_app(
             llm_factory(),
             tone=body.tone,
             wishes=body.wishes,
+            mention_gaps=body.mention_gaps,
             resume_path=ws.resume_path,
         )
         application = s.get(Application, vacancy_id) or Application(vacancy_id=vacancy_id)
@@ -532,6 +534,11 @@ def create_app(
             # ручное не теряем: настройки, «что ещё умею», имя
             profile.preferences, profile.extra, profile.name = old.preferences, old.extra, old.name
             profile.careers = old.careers
+            profile.stories, profile.full_name, profile.contacts = (
+                old.stories,
+                old.full_name,
+                old.contacts,
+            )
         save_profile(profile, ws.profile_path)
         return profile
 

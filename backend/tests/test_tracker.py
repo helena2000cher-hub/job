@@ -116,7 +116,7 @@ def test_cover_letter_endpoint_saves_into_application(setup):
     assert smart is False  # письма пишет быстрая (дешёвая) модель
     assert "живой" in user and "коротко" in user
     assert "СИЛЬНЫЕ СОВПАДЕНИЯ С ВАКАНСИЕЙ\nBPMN" in user
-    assert "SQL" not in user.split("ВАКАНСИЯ")[-1]  # пробелы в письмо не передаются
+    assert "ЧЕГО НЕ ХВАТАЕТ ПО ОЦЕНКЕ\nSQL" in user  # для блока «Честно о пробелах»
     assert "345-67-89" not in user  # контакты из резюме вычищены
 
 
@@ -165,10 +165,55 @@ def test_letter_normalizes_escaped_newlines(profile, tmp_path):
     assert letter.subject == "Тема"
 
 
-def test_letter_prompt_sells_strengths(profile, tmp_path):
-    llm = FakeLLM([LETTER])
+def test_letter_template_stories_name_and_signature(profile, tmp_path):
+    body = "Здравствуйте!\nМеня зовут {NAME}. Я аналитик.\n* Проект — факт"
+    llm = FakeLLM([{"subject": "Тема", "letter": body}])
     profile.extra = "Make — проходила на курсе"
-    generate_cover_letter(profile, make_vacancy(1, "А"), None, llm, resume_path=tmp_path / "x")
+    profile.stories = "Нашла завышенную метрику прогнозов и переделала оценку"
+    profile.name, profile.full_name = "Елена", "Елена Дорохина"
+    profile.contacts = "+7 963 000-00-00, Telegram @demo"
+
+    letter = generate_cover_letter(
+        profile, make_vacancy(1, "А"), None, llm, resume_path=tmp_path / "x"
+    ).letter
+
+    assert letter.startswith("Здравствуйте!\nМеня зовут Елена. Я аналитик.\n• Проект — факт")
+    assert letter.endswith("Елена Дорохина\n+7 963 000-00-00, Telegram @demo")
     system, user, _ = llm.chat_calls[0]
-    assert "НЕ перечисляй, чего у кандидата нет" in system
-    assert "Дополнительно (нет в резюме): Make — проходила на курсе" in user
+    assert "Что уже сделано на практике" in system and "Честно о пробелах" in system
+    assert "Нашла завышенную метрику" in user and "Make — проходила на курсе" in user
+    # имя и контакты в нейросеть не уходят — их подставляет код
+    assert "Елена" not in user and "963" not in user and "@demo" not in user
+
+
+def test_letter_without_gaps_and_without_name(profile, tmp_path):
+    from app.models import Match
+
+    match = Match(
+        vacancy_id="test:1", profile_fingerprint="x", content_hash="x", score=70,
+        similarity=0.5, matched_skills=["BPMN"], missing_skills=["Kafka"],
+    )  # fmt: skip
+    llm = FakeLLM([{"letter": "Здравствуйте!\nМеня зовут {NAME}. Я аналитик."}])
+
+    letter = generate_cover_letter(
+        profile, make_vacancy(1, "А"), match, llm, mention_gaps=False, resume_path=tmp_path / "x"
+    ).letter
+
+    assert letter == "Здравствуйте!\nЯ аналитик."  # без имени фраза «Меня зовут» убрана
+    system, user, _ = llm.chat_calls[0]
+    assert "Пробелы не упоминай" in system and "Kafka" not in user
+
+
+def test_gender_from_resume_reaches_prompt(profile, tmp_path):
+    from app.cover_letter import detect_gender
+
+    assert detect_gender("Иванова Анна\nЖенщина, 30 лет").startswith("женский")
+    assert detect_gender("Мужчина, 41 год").startswith("мужской")
+    assert detect_gender("Аналитик") is None
+
+    resume = tmp_path / "resume.txt"
+    resume.write_text("Анна\nЖенщина, 30 лет\nОпыт: BPMN", encoding="utf-8")
+    llm = FakeLLM([LETTER])
+    generate_cover_letter(profile, make_vacancy(1, "А"), None, llm, resume_path=resume)
+    _, user, _ = llm.chat_calls[0]
+    assert "ПОЛ КАНДИДАТА: женский" in user
