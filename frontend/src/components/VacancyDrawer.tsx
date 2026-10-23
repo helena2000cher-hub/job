@@ -1,5 +1,5 @@
 import { AlertTriangle, ExternalLink, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { api } from '../api'
 import type { Application, Mark, VacancyDetail } from '../api'
@@ -21,6 +21,12 @@ export function VacancyDrawer({ id, onClose, onMark, onApplicationChange }: Prop
   const [vacancy, setVacancy] = useState<VacancyDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [askApplied, setAskApplied] = useState(false)
+  const applyRef = useRef<HTMLDivElement>(null)
+
+  // Перешли на сайт кнопкой сверху — прокручиваем к вопросу под письмом
+  useEffect(() => {
+    if (askApplied) applyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [askApplied])
 
   useEffect(() => {
     let cancelled = false
@@ -109,16 +115,6 @@ export function VacancyDrawer({ id, onClose, onMark, onApplicationChange }: Prop
               </Button>
             </div>
 
-            {askApplied && (
-              <AppliedPrompt
-                vacancyId={vacancy.id}
-                onAnswered={(application) => {
-                  if (application) changeApplication(application)
-                  setAskApplied(false)
-                }}
-              />
-            )}
-
             {vacancy.score !== null && (
               <section className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Почему такая оценка</h3>
@@ -141,6 +137,32 @@ export function VacancyDrawer({ id, onClose, onMark, onApplicationChange }: Prop
             )}
 
             <CoverLetter vacancyId={vacancy.id} application={vacancy.application} onChange={changeApplication} />
+
+            {/* Шаги по порядку: письмо → перейти и откликнуться → отметить «отправлен» */}
+            {shouldAskApplied(vacancy.stage) && (
+              <div ref={applyRef} className="space-y-2">
+                {vacancy.url && !askApplied && (
+                  <a
+                    href={vacancy.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setAskApplied(true)}
+                    className={buttonClass('secondary', 'w-full sm:w-auto')}
+                  >
+                    Перейти на сайт и откликнуться <ExternalLink className="h-4 w-4" />
+                  </a>
+                )}
+                {(askApplied || !vacancy.url) && (
+                  <AppliedPrompt
+                    vacancyId={vacancy.id}
+                    onAnswered={(application) => {
+                      if (application) changeApplication(application)
+                      setAskApplied(false)
+                    }}
+                  />
+                )}
+              </div>
+            )}
 
             <Section title="Обязанности">{vacancy.duties}</Section>
             <Section title="Требования">{vacancy.requirements}</Section>
