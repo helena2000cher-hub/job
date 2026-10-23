@@ -8,6 +8,11 @@ export function useSession(): Me {
   return useContext(SessionContext)
 }
 
+/** Показывать «внутреннюю кухню»: стоимость, названия сервисов. Для клиентов — скрыто. */
+export function useInternals(): boolean {
+  return useSession().internals !== false
+}
+
 export function useIsDemo(): boolean {
   return useSession().role === 'demo'
 }

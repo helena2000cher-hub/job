@@ -15,6 +15,9 @@ from app.storage import save_vacancies
 
 log = logging.getLogger(__name__)
 
+# Как источник называется для пользователя: Exa — внутренний поисковик, его не показываем
+SOURCE_TITLES = {"exa": "hh.ru и Хабр Карьера", "trudvsem": "Работа России", "superjob": "SuperJob"}
+
 
 @dataclass
 class CollectResult:
@@ -54,11 +57,11 @@ def collect(
         except httpx.HTTPError as exc:  # один упавший запрос не должен терять результаты остальных
             log.warning("%s: запрос «%s» не выполнен: %s", source, text, exc)
             result.failed_queries.append(text)
-            on_progress(f"{source}: «{text}» — ошибка")
+            on_progress(f"«{text}»: не удалось загрузить, пропускаю")
             continue
         new = sum(v.id not in vacancies for v in found)
         vacancies.update((v.id, v) for v in found)
-        on_progress(f"{source}: «{text}» — {len(found)} (новых в этом прогоне: {new})")
+        on_progress(f"«{text}»: найдено {len(found)}, новых {new}")
 
     engine = get_engine()
     init_db(engine)

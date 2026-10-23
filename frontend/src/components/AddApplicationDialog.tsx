@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { api } from '../api'
 import type { ManualApplicationOut, Stage } from '../api'
+import { useInternals } from '../session'
 import { STAGES } from '../stages'
 import { Button, Spinner } from './ui'
 
@@ -57,6 +58,7 @@ function AddApplicationDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
+  const internals = useInternals()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !busy && onClose()
@@ -98,7 +100,7 @@ function AddApplicationDialog({
           </button>
         </div>
 
-        <Labeled label="Ссылка на вакансию" hint="Название, компания и описание подтянутся сами (≈ 0,1 ₽)">
+        <Labeled label="Ссылка на вакансию" hint={`Название, компания и описание подтянутся сами${internals ? ' (≈ 0,1 ₽)' : ''}`}>
           <input
             type="url"
             inputMode="url"

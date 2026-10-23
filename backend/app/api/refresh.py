@@ -10,7 +10,7 @@ from pathlib import Path
 from sqlalchemy.engine import Engine
 from sqlmodel import Session
 
-from app.collecting import collect
+from app.collecting import SOURCE_TITLES, collect
 from app.config import get_settings
 from app.llm import PolzaLLM
 from app.matching.pipeline import run_matching
@@ -48,7 +48,7 @@ def default_runner(state: RefreshState, sources: list[str], engine: Engine, prof
     region = None if prefs.remote_only else get_settings().default_region_code
 
     for source in sources:
-        state.log.append(f"Сбор: {source}…")
+        state.log.append(f"Ищу на {SOURCE_TITLES.get(source, source)}…")
         result = collect(
             source,
             profile.effective_queries(),  # только отмеченные профессии
@@ -59,13 +59,14 @@ def default_runner(state: RefreshState, sources: list[str], engine: Engine, prof
         )
         state.new_vacancies += result.created
         state.cost_dollars += result.cost_dollars
-        state.log.append(f"{source}: новых {result.created}, обновлено {result.updated}")
+        title = SOURCE_TITLES.get(source, source)
+        state.log.append(f"{title}: новых вакансий {result.created}")
 
-    state.log.append("Оценка вакансий…")
+    state.log.append("Сравниваю вакансии с вашим профилем…")
     with Session(engine, expire_on_commit=False) as session:
         report = run_matching(session, profile, PolzaLLM(), top_n=MATCH_TOP_N)
     state.scored = report.scored
-    state.log.append(f"Оценено: {report.scored} новых, {report.reused} из кэша")
+    state.log.append(f"Оценено вакансий: {report.scored + report.reused}")
 
 
 class RefreshJob:

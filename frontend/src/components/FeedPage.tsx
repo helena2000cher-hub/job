@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import type { Application, Feed, FeedView, Mark } from '../api'
 import { formatDateTime, sourceLabel } from '../format'
+import { useIsDemo } from '../session'
+import { AddApplicationButton } from './AddApplicationDialog'
 import { EmptyState, Spinner } from './ui'
 import { VacancyCard } from './VacancyCard'
 import { VacancyDrawer } from './VacancyDrawer'
@@ -31,6 +33,8 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [added, setAdded] = useState<string | null>(null)
+  const isDemo = useIsDemo()
 
   useEffect(() => {
     let cancelled = false
@@ -109,12 +113,30 @@ export function FeedPage({ reloadKey, onGoToProfile }: Props) {
             вакансию, чтобы увидеть, чего не хватает, и создать сопроводительное письмо.
           </p>
         </div>
-        {feed && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            В базе {feed.total_vacancies} · оценено {feed.scored} · сбор: {formatDateTime(feed.last_fetched_at)}
-          </p>
-        )}
+        <div className="flex flex-col items-end gap-2">
+          {!isDemo && (
+            <AddApplicationButton
+              onAdded={(r) =>
+                setAdded(`«${r.title}» добавлена в «Мои отклики» — она уже учитывается в аналитике.`)
+              }
+            />
+          )}
+          {feed && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              В базе {feed.total_vacancies} · оценено {feed.scored} · сбор: {formatDateTime(feed.last_fetched_at)}
+            </p>
+          )}
+        </div>
       </div>
+
+      {added && (
+        <p className="flex flex-wrap items-center gap-x-3 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+          {added}
+          <a href="#/analytics" className="font-medium underline">
+            Открыть «Мои отклики»
+          </a>
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
         <input

@@ -2,12 +2,13 @@ import { Check, RefreshCw, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { RefreshState } from '../api'
+import { useInternals } from '../session'
 import { Button, Spinner } from './ui'
 
 const SOURCES = [
-  { id: 'exa', label: 'hh.ru, Хабр Карьера, сайты компаний', hint: 'поиск через Exa · ≈ $0.5 из бесплатных $10 в месяц', noKey: 'нужен EXA_API_KEY в .env' },
-  { id: 'superjob', label: 'SuperJob', hint: 'официальный API · бесплатно', noKey: 'нужен бесплатный ключ: api.superjob.ru/register → SUPERJOB_API_KEY в .env' },
-  { id: 'trudvsem', label: 'Работа России', hint: 'бесплатно · медленно, 3–6 минут', noKey: '' },
+  { id: 'exa', label: 'hh.ru, Хабр Карьера, сайты компаний', hint: 'поиск через Exa · ≈ $0.5 из бесплатных $10 в месяц', publicHint: 'крупнейшие сайты вакансий', noKey: 'нужен EXA_API_KEY в .env' },
+  { id: 'superjob', label: 'SuperJob', hint: 'официальный API · бесплатно', publicHint: 'вакансии от работодателей', noKey: 'нужен бесплатный ключ: api.superjob.ru/register → SUPERJOB_API_KEY в .env' },
+  { id: 'trudvsem', label: 'Работа России', hint: 'бесплатно · медленно, 3–6 минут', publicHint: 'государственный портал · ищется дольше остальных', noKey: '' },
 ]
 
 export function RefreshButton({ onDone }: { onDone: () => void }) {
@@ -20,6 +21,7 @@ export function RefreshButton({ onDone }: { onDone: () => void }) {
   const wasRunning = useRef(false)
   const onDoneRef = useRef(onDone)
   const panel = useRef<HTMLDivElement>(null)
+  const internals = useInternals()
 
   useEffect(() => {
     onDoneRef.current = onDone
@@ -112,6 +114,7 @@ export function RefreshButton({ onDone }: { onDone: () => void }) {
               <div className="mt-3 space-y-2">
                 {SOURCES.map((s) => {
                   const on = available[s.id] ?? false
+                  if (!on && !internals) return null // клиентам не показываем неподключённые источники
                   return (
                     <label
                       key={s.id}
@@ -128,7 +131,7 @@ export function RefreshButton({ onDone }: { onDone: () => void }) {
                       />
                       <span>
                         <span className="block text-sm font-medium">{s.label}</span>
-                        <span className="block text-xs text-slate-500 dark:text-slate-400">{on ? s.hint : s.noKey}</span>
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">{on ? (internals ? s.hint : s.publicHint) : s.noKey}</span>
                       </span>
                     </label>
                   )
@@ -137,7 +140,7 @@ export function RefreshButton({ onDone }: { onDone: () => void }) {
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                 {selected.length === 0
                   ? 'Ничего не выбрано — только пересчитаем оценки под текущий профиль.'
-                  : 'Запросы берутся из профиля. Лучшие совпадения оценит нейросеть (≈ 2 ₽ за поиск).'}
+                  : `Ищем по выбранным профессиям, лучшие совпадения оценит нейросеть${internals ? ' (≈ 2 ₽ за поиск)' : ''}.`}
               </p>
               <Button variant="primary" className="mt-3 w-full" onClick={start}>
                 {selected.length === 0 ? 'Пересчитать оценки' : 'Найти и оценить'}
@@ -169,8 +172,8 @@ export function RefreshButton({ onDone }: { onDone: () => void }) {
                   <li key={i}>{line}</li>
                 ))}
               </ol>
-              {state.cost_dollars > 0 && (
-                <p className="mt-2 text-xs text-slate-500">Стоимость Exa: ${state.cost_dollars.toFixed(2)}</p>
+              {internals && state.cost_dollars > 0 && (
+                <p className="mt-2 text-xs text-slate-500">Стоимость поиска (Exa): ${state.cost_dollars.toFixed(2)}</p>
               )}
             </div>
           )}

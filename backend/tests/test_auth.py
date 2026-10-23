@@ -102,6 +102,7 @@ def test_guest_sees_only_demo(site):
         "role": "demo",
         "auth_enabled": True,
         "demo_available": True,
+        "internals": True,
     }
     titles = [i["title"] for i in guest.get("/api/feed").json()["items"]]
     assert titles and "Секретная вакансия владельца" not in titles
@@ -172,3 +173,13 @@ def test_without_demo_guest_must_log_in(tmp_path, profile):
     assert guest.get("/api/auth/me").status_code == 401
     assert login(guest).status_code == 200
     assert guest.get("/api/auth/me").json()["role"] == "owner"
+
+
+def test_public_mode_hides_internals(tmp_path, profile):
+    path = tmp_path / "p.json"
+    save_profile(profile, path)
+    app = create_app(memory_engine(), path, serve_frontend=False, public_mode=True)
+    app.state.refresh.state.cost_dollars = 0.71
+    client = TestClient(app)
+    assert client.get("/api/auth/me").json()["internals"] is False
+    assert client.get("/api/refresh").json()["cost_dollars"] == 0  # стоимость клиентам не видна

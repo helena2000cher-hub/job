@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { api } from '../api'
 import type { Advice, Analytics, RateRow, SentItem, Stage } from '../api'
 import { formatDate, formatDateTime, sourceLabel } from '../format'
-import { useIsDemo } from '../session'
+import { useInternals, useIsDemo } from '../session'
 import { STAGES } from '../stages'
 import { AddApplicationButton } from './AddApplicationDialog'
 import { Button, EmptyState, Spinner } from './ui'
@@ -310,6 +310,7 @@ function AdviceBlock({ initial, sent }: { initial: Advice | null; sent: number }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const isDemo = useIsDemo()
+  const internals = useInternals()
 
   const generate = async () => {
     setBusy(true)
@@ -333,7 +334,7 @@ function AdviceBlock({ initial, sent }: { initial: Advice | null; sent: number }
           </h2>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             Нейросеть смотрит на статистику откликов и частые пробелы и подсказывает, что поправить в резюме
-            и письмах (≈ 0,05 ₽).
+            и письмах{internals ? ' (≈ 0,05 ₽)' : ''}.
             {advice && ` Последние советы: ${formatDateTime(advice.generated_at)}, по ${advice.based_on_sent} откликам.`}
           </p>
         </div>

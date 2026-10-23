@@ -157,6 +157,7 @@ class Me(BaseModel):
     role: Literal["owner", "demo"]
     auth_enabled: bool
     demo_available: bool
+    internals: bool = True  # показывать стоимость и сервисы (личный режим); False — для клиентов
 
 
 @dataclass(frozen=True)
@@ -216,6 +217,7 @@ def create_app(
     resume_path: Path = RESUME_PATH,
     vacancy_fetcher: Callable[[str], Vacancy | None] = fetch_vacancy,
     available_sources: Callable[[], dict[str, bool]] | None = None,
+    public_mode: bool = False,
     auth: Auth | None = None,
     demo_engine: Engine | None = None,
     demo_profile_path: Path | None = None,
@@ -272,12 +274,15 @@ def create_app(
             role="demo" if ws.demo else "owner",
             auth_enabled=auth.enabled,
             demo_available=demo is not None,
+            internals=not public_mode,
         )
 
     @app.post("/api/auth/login", response_model=Me)
     def login(body: LoginIn, request: Request, response: Response):
         if not auth.enabled:
-            return Me(role="owner", auth_enabled=False, demo_available=False)
+            return Me(
+                role="owner", auth_enabled=False, demo_available=False, internals=not public_mode
+            )
         client = request.client.host if request.client else "?"
         if auth.is_blocked(client):
             raise HTTPException(429, "Слишком много попыток. Подождите 5 минут")
@@ -293,7 +298,12 @@ def create_app(
             secure=cookie_secure,
             samesite="lax",
         )
-        return Me(role="owner", auth_enabled=True, demo_available=demo is not None)
+        return Me(
+            role="owner",
+            auth_enabled=True,
+            demo_available=demo is not None,
+            internals=not public_mode,
+        )
 
     @app.post("/api/auth/logout", status_code=204)
     def logout(response: Response):
@@ -584,7 +594,10 @@ def create_app(
     def refresh_status(request: Request, ws: WsDep):
         if ws.demo:
             return RefreshState().to_dict()  # журнал владельца гостям не показываем
-        return request.app.state.refresh.state.to_dict()
+        state = request.app.state.refresh.state.to_dict()
+        if public_mode:
+            state["cost_dollars"] = 0  # стоимость — внутренняя кухня, клиентам не показываем
+        return state
 
     @app.post("/api/refresh", status_code=202)
     def refresh(body: RefreshIn, request: Request, ws: OwnerDep):
@@ -623,6 +636,7 @@ def create_app_from_settings() -> FastAPI:
         demo_profile_path=DATA_DIR / "demo_profile.json",
         demo_reset_hours=settings.demo_reset_hours,
         cookie_secure=settings.cookie_secure,
+        public_mode=settings.public_mode,
     )
 
 

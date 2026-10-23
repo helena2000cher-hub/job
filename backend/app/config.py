@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     cookie_secure: bool = False  # True за HTTPS (на сервере)
     demo_enabled: bool = True  # гостям без входа показывать демо на вымышленных данных
     demo_reset_hours: float = 6  # демо-песочница сбрасывается к исходным данным
+    # Коммерческий режим: интерфейс не показывает стоимость и названия внутренних сервисов
+    public_mode: bool = False
 
 
 @lru_cache

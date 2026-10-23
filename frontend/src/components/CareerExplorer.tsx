@@ -1,5 +1,6 @@
 import { Check, Compass, Plus, Sparkles } from 'lucide-react'
 import type { CareerKind, CareerOption, CareerSuggestions } from '../api'
+import { useInternals } from '../session'
 import { Button, Spinner } from './ui'
 
 const GROUPS: { kind: CareerKind; title: string; hint: string }[] = [
@@ -22,6 +23,7 @@ interface Props {
 
 /** «Кем я могу работать»: профессии, подобранные по навыкам, с процентом совпадения. */
 export function CareerExplorer({ careers, skills, extra, selected, busy, disabled, disabledHint, onGenerate, onToggle }: Props) {
+  const internals = useInternals()
   const isSelected = (title: string) => selected.some((s) => s.trim().toLowerCase() === title.trim().toLowerCase())
   const stale =
     careers !== null &&
@@ -48,7 +50,7 @@ export function CareerExplorer({ careers, skills, extra, selected, busy, disable
       </div>
 
       {disabled && disabledHint && <p className="text-xs text-slate-500 dark:text-slate-400">{disabledHint}</p>}
-      {busy && <p className="text-xs text-slate-500">Подбираю профессии по навыкам, это займёт до 30 секунд (≈ 0,05 ₽)…</p>}
+      {busy && <p className="text-xs text-slate-500">Подбираю профессии по навыкам, это займёт до 30 секунд{internals ? ' (≈ 0,05 ₽)' : ''}…</p>}
       {stale && !busy && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
           Навыки изменились после подбора — нажмите «Обновить подбор», чтобы список их учёл.

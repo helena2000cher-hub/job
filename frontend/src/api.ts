@@ -136,6 +136,7 @@ export interface Me {
   role: 'owner' | 'demo'
   auth_enabled: boolean
   demo_available: boolean
+  internals?: boolean // личный режим: показывать стоимость и названия сервисов
 }
 
 export class ApiError extends Error {
