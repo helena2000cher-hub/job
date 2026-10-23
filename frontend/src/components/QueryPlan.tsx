@@ -1,7 +1,7 @@
 import { Eraser, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import type { Profile } from '../api'
-import { effectiveQueries, norm, queryPlan } from '../queries'
+import { norm, professionQueries, queryPlan } from '../queries'
 import { Button } from './ui'
 
 /** Отмеченные профессии и запросы каждой — именно по ним «Найти вакансии» собирает вакансии. */
@@ -10,7 +10,7 @@ export function QueryPlan({ profile, onRoles }: { profile: Profile; onRoles: (ro
   const plan = queryPlan(profile)
   const hasCards = (profile.careers?.options.length ?? 0) > 0
   const legacy = hasCards ? plan.filter((r) => !r.hasCard) : []
-  const total = effectiveQueries(profile).length
+  const total = professionQueries(profile).length
 
   const add = () => {
     const role = draft.trim()
@@ -24,7 +24,7 @@ export function QueryPlan({ profile, onRoles }: { profile: Profile; onRoles: (ro
         <p className="text-sm text-slate-600 dark:text-slate-300">
           {plan.length === 0
             ? 'Профессии не выбраны — отметьте «Искать эту работу» в подборе выше.'
-            : `Поиск пойдёт по ${total} ${plural(total, 'запросу', 'запросам', 'запросам')} для ${plan.length} ${plural(plan.length, 'профессии', 'профессий', 'профессий')}.`}
+            : `${total} ${plural(total, 'запрос', 'запроса', 'запросов')} для ${plan.length} ${plural(plan.length, 'профессии', 'профессий', 'профессий')}.`}
         </p>
         {legacy.length > 0 && (
           <Button onClick={() => onRoles(plan.filter((r) => r.hasCard).map((r) => r.role))}>

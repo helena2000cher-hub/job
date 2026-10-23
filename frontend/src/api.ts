@@ -117,6 +117,8 @@ export interface Profile {
   full_name: string
   contacts: string
   search_queries: string[]
+  search_mode: 'professions' | 'skills' | 'both'
+  search_skills: string[]
   preferences: Preferences
   careers: CareerSuggestions | null
 }

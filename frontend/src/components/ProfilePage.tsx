@@ -6,7 +6,7 @@ import type { CareerOption, Profile } from '../api'
 import { useIsDemo } from '../session'
 import { withRoles } from '../queries'
 import { CareerExplorer } from './CareerExplorer'
-import { QueryPlan } from './QueryPlan'
+import { SearchSettings } from './SearchSettings'
 import { Button, EmptyState, Spinner } from './ui'
 
 export function ProfilePage({ onSaved }: { onSaved: () => void }) {
@@ -170,8 +170,8 @@ export function ProfilePage({ onSaved }: { onSaved: () => void }) {
       />
 
       <fieldset disabled={isDemo} className="space-y-6 disabled:opacity-90">
-      <Card title="Что и где искать" subtitle="«Найти вакансии» ищет только по отмеченным профессиям — по запросам из их карточек.">
-        <QueryPlan profile={profile} onRoles={(roles) => setProfile(withRoles(profile, roles))} />
+      <Card title="Что и где искать" subtitle="По профессиям — точнее, по навыкам — шире. «Найти вакансии» ищет по выбранному варианту.">
+        <SearchSettings profile={profile} onChange={setProfile} />
         <label className="flex items-center gap-3">
           <input
             type="checkbox"

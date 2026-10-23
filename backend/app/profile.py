@@ -10,6 +10,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -48,6 +49,9 @@ class Profile(BaseModel):
     full_name: str = Field(default="", description="подпись письма; в нейросеть не передаётся")
     contacts: str = Field(default="", description="контакты в подписи; в нейросеть не передаются")
     search_queries: list[str] = Field(default_factory=list, description="запросы для сбора")
+    # Что ищем: по названиям выбранных профессий, по навыкам или по тому и другому
+    search_mode: Literal["professions", "skills", "both"] = "professions"
+    search_skills: list[str] = Field(default_factory=list, description="навыки для поиска")
     preferences: Preferences = Field(default_factory=Preferences)
     careers: CareerSuggestions | None = Field(
         default=None, description="профессии, подобранные по навыкам"
@@ -80,19 +84,33 @@ class Profile(BaseModel):
         return plan
 
     def effective_queries(self) -> list[str]:
-        """Search queries = queries of the selected professions only (no duplicates)."""
+        """Search queries by the chosen mode: professions' queries, skills, or both (no duplicates).
+
+        Сайты вакансий ищут по всему тексту, поэтому запрос «n8n» находит и вакансии
+        с неожиданными названиями, которые поиск по профессиям пропускает.
+        """
+        candidates: list[str] = []
+        if self.search_mode in ("professions", "both"):
+            candidates += [q for _, qs in self.query_plan() for q in qs]
+        if self.search_mode in ("skills", "both"):
+            candidates += self.search_skills
         queries: list[str] = []
-        for _, qs in self.query_plan():
-            for q in qs:
-                if not any(_norm(q) == _norm(x) for x in queries):
-                    queries.append(q)
-        return queries or list(self.search_queries)  # профессий нет — старый список запросов
+        for q in candidates:
+            if q.strip() and not any(_norm(q) == _norm(x) for x in queries):
+                queries.append(q.strip())
+        return queries or list(self.search_queries)  # ничего не выбрано — старый список
 
     def fingerprint(self) -> str:
         """Changes whenever the profile changes — cached match scores are then recomputed."""
-        # Имя, подпись, истории для писем и подсказки профессий на оценку вакансий не влияют —
-        # их правка не должна сбрасывать оценки
-        data = self.model_dump_json(exclude={"name", "full_name", "contacts", "stories", "careers"})
+        # Влияет только то, по чему вакансию ОЦЕНИВАЮТ. Имя, подпись, истории для писем,
+        # подсказки профессий и настройки ПОИСКА (что собирать) оценку не меняют —
+        # их правка не должна сбрасывать оценки.
+        data = self.model_dump_json(
+            exclude={
+                "name", "full_name", "contacts", "stories", "careers",
+                "search_queries", "search_mode", "search_skills",
+            }
+        )  # fmt: skip
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 

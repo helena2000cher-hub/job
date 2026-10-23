@@ -125,3 +125,35 @@ def test_saving_profile_syncs_queries_with_professions(tmp_path, profile):
         "бизнес-аналитик", "ai инженер", "LLM разработчик", "Финансовый аналитик"
     ]  # fmt: skip
     assert load_profile(path).search_queries == saved["search_queries"]
+
+
+def test_search_modes_professions_skills_both():
+    profile = _profile_with_cards()
+    profile.search_skills = ["n8n", "RAG", "бизнес-аналитик"]  # дубль с запросом профессии
+
+    profile.search_mode = "professions"
+    assert "n8n" not in profile.effective_queries()
+
+    profile.search_mode = "skills"
+    assert profile.effective_queries() == ["n8n", "RAG", "бизнес-аналитик"]
+
+    profile.search_mode = "both"
+    queries = profile.effective_queries()
+    assert queries[:4] == [
+        "бизнес-аналитик",
+        "ai инженер",
+        "LLM разработчик",
+        "Финансовый аналитик",
+    ]
+    assert queries[4:] == ["n8n", "RAG"]  # без дублей
+
+
+def test_search_settings_do_not_reset_scores():
+    profile = _profile_with_cards()
+    before = profile.fingerprint()
+    profile.search_mode = "both"
+    profile.search_skills = ["n8n"]
+    profile.search_queries = ["что-то"]
+    assert profile.fingerprint() == before  # поиск ≠ оценка: оценки не сбрасываются
+    profile.skills.append("SQL")
+    assert profile.fingerprint() != before  # а навыки на оценку влияют
