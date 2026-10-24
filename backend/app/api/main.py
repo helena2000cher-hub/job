@@ -30,7 +30,17 @@ from app.db import get_engine, init_db
 from app.demo import DemoResetter
 from app.llm import LLM, PolzaLLM
 from app.models import SENT_STAGES, STAGES, Application, Match, Vacancy, VacancyMark, utcnow
-from app.profile import PROFILE_PATH, RESUME_PATH, Profile, build_profile, read_resume, save_profile
+from app.profile import PROFILE_PATH, RESUME_PATH, Profile, rebuild_profile, save_profile
+from app.resume import (
+    MAX_UPLOAD_BYTES,
+    ResumeError,
+    ResumeForm,
+    ResumeSource,
+    ResumeStore,
+    extract_text,
+    fetch_resume_text,
+    form_from_text,
+)
 from app.tracker import compute_analytics, mark_no_response
 
 FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
@@ -168,6 +178,20 @@ class Workspace:
     demo: bool = False
 
 
+class ResumeOut(BaseModel):
+    source: ResumeSource | None
+    form: ResumeForm | None
+
+
+class ResumeResult(BaseModel):
+    profile: Profile
+    source: ResumeSource
+
+
+class ResumeLinkIn(BaseModel):
+    url: str
+
+
 class RefreshIn(BaseModel):
     sources: list[str] = ["trudvsem", "exa"]
 
@@ -216,6 +240,7 @@ def create_app(
     llm_factory: Callable[[], LLM] = PolzaLLM,
     resume_path: Path = RESUME_PATH,
     vacancy_fetcher: Callable[[str], Vacancy | None] = fetch_vacancy,
+    resume_fetcher: Callable[[str], str] = fetch_resume_text,
     available_sources: Callable[[], dict[str, bool]] | None = None,
     public_mode: bool = False,
     auth: Auth | None = None,
@@ -534,23 +559,77 @@ def create_app(
         save_profile(profile, ws.profile_path)
         return profile
 
-    @app.post("/api/profile/rebuild", response_model=Profile)
-    def rebuild_profile(ws: OwnerDep):
-        if not ws.resume_path.exists():
-            raise HTTPException(400, "Положите резюме в data/resume.pdf")
-        old = current_profile(ws)
-        profile = build_profile(read_resume(ws.resume_path), llm_factory())
-        if old:
-            # ручное не теряем: настройки, «что ещё умею», имя
-            profile.preferences, profile.extra, profile.name = old.preferences, old.extra, old.name
-            profile.careers = old.careers
-            profile.stories, profile.full_name, profile.contacts = (
-                old.stories,
-                old.full_name,
-                old.contacts,
-            )
+    def rebuild_from(ws: Workspace, text: str) -> Profile:
+        """Профиль из текста резюме: навыки добавляются, ручные правки и профессии остаются."""
+        try:
+            profile = rebuild_profile(text, current_profile(ws), llm_factory())
+        except ResumeError as exc:
+            raise HTTPException(400, str(exc)) from exc
         save_profile(profile, ws.profile_path)
         return profile
+
+    @app.post("/api/profile/rebuild", response_model=Profile)
+    def rebuild(ws: OwnerDep):
+        text = ResumeStore(ws.resume_path).text()
+        if not text:
+            raise HTTPException(
+                400, "Резюме ещё нет: загрузите файл, дайте ссылку или заполните анкету"
+            )
+        return rebuild_from(ws, text)
+
+    @app.get("/api/resume", response_model=ResumeOut)
+    def resume_info(ws: WsDep):
+        store = ResumeStore(ws.resume_path)
+        return ResumeOut(source=store.source(), form=store.form())
+
+    @app.post("/api/resume/file", response_model=ResumeResult)
+    async def upload_resume(request: Request, filename: str, ws: OwnerDep):
+        """Файл резюме — телом запроса (без multipart): PDF, DOCX, ODT, RTF, TXT."""
+        data = await request.body()
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "Файл больше 10 МБ — резюме обычно намного меньше")
+        try:
+            text = extract_text(data, filename)
+        except ResumeError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        profile = rebuild_from(ws, text)
+        source = ResumeStore(ws.resume_path).save_text(text, "file", Path(filename).name)
+        return ResumeResult(profile=profile, source=source)
+
+    @app.post("/api/resume/link", response_model=ResumeResult)
+    def resume_by_link(body: ResumeLinkIn, ws: OwnerDep):
+        try:
+            text = resume_fetcher(body.url)
+        except ResumeError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        profile = rebuild_from(ws, text)
+        source = ResumeStore(ws.resume_path).save_text(text, "link", body.url.strip())
+        return ResumeResult(profile=profile, source=source)
+
+    @app.put("/api/resume/form", response_model=ResumeOut)
+    def save_resume_form(form: ResumeForm, ws: OwnerDep):
+        store = ResumeStore(ws.resume_path)
+        store.save_form(form)
+        return ResumeOut(source=store.source(), form=form)
+
+    @app.post("/api/resume/form/build", response_model=ResumeResult)
+    def build_from_form(form: ResumeForm, ws: OwnerDep):
+        """Сохранить анкету и собрать по ней профиль; анкета становится текущим резюме."""
+        text = form.to_text()
+        if len(text) < 80:
+            raise HTTPException(400, "Анкета почти пустая: добавьте опыт работы и навыки")
+        store = ResumeStore(ws.resume_path)
+        store.save_form(form)
+        profile = rebuild_from(ws, text)
+        return ResumeResult(profile=profile, source=store.save_text(text, "form", "Анкета"))
+
+    @app.post("/api/resume/form/prefill", response_model=ResumeForm)
+    def prefill_form(ws: OwnerDep):
+        """Разложить текущее резюме по полям анкеты (≈ 0,1 ₽), чтобы не заполнять с нуля."""
+        text = ResumeStore(ws.resume_path).text()
+        if not text:
+            raise HTTPException(400, "Резюме ещё нет — заполните анкету вручную")
+        return form_from_text(text, llm_factory())
 
     def advice_path(ws: Workspace) -> Path:
         return ws.profile_path.parent / ("demo_advice.json" if ws.demo else "advice.json")

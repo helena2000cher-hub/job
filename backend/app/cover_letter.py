@@ -16,7 +16,8 @@ from typing import Literal
 from app.llm import LLM
 from app.matching.scorer import vacancy_card
 from app.models import Match, Vacancy
-from app.profile import RESUME_PATH, Profile, read_resume, redact_pii
+from app.profile import RESUME_PATH, Profile, redact_pii
+from app.resume import ResumeStore
 
 MAX_RESUME_CHARS = 6000
 NAME_PLACEHOLDER = "{NAME}"
@@ -80,9 +81,7 @@ def generate_cover_letter(
     mention_gaps: bool = True,
     resume_path: Path = RESUME_PATH,
 ) -> CoverLetter:
-    resume = ""
-    if resume_path.exists():
-        resume = redact_pii(read_resume(resume_path))[:MAX_RESUME_CHARS]
+    resume = redact_pii(ResumeStore(resume_path).text())[:MAX_RESUME_CHARS]
 
     parts = [f"ТОН: {TONES[tone]}", f"КАНДИДАТ\n{profile.headline}\n{profile.matching_text()}"]
     gender = detect_gender(resume)

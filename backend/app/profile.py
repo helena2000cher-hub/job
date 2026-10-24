@@ -150,17 +150,43 @@ def redact_pii(text: str) -> str:
 
 
 def read_resume(path: Path) -> str:
-    if path.suffix.lower() == ".pdf":
-        from pypdf import PdfReader
+    from app.resume import extract_text  # PDF, Word, ODT, RTF, TXT
 
-        return "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
-    return path.read_text(encoding="utf-8")
+    return extract_text(path.read_bytes(), path.name)
 
 
 def build_profile(resume_text: str, llm: LLM) -> Profile:
     data = llm.chat_json(SYSTEM_PROMPT, redact_pii(resume_text), smart=True)
     prefs = {k: v for k, v in (data.pop("preferences", None) or {}).items() if v not in (None, [])}
     return Profile(**data, preferences=Preferences(**prefs))
+
+
+def rebuild_profile(resume_text: str, old: Profile | None, llm: LLM) -> Profile:
+    """New profile from a resume that keeps everything the user did by hand.
+
+    Навыки из резюме добавляются к уже имеющимся (вписанные вручную не пропадают),
+    выбранные профессии и настройки поиска остаются, если в профиле уже есть подбор профессий.
+    """
+    profile = build_profile(resume_text, llm)
+    if old is None:
+        return profile
+    profile.skills = _merge(profile.skills, old.skills)
+    profile.preferences, profile.extra, profile.name = old.preferences, old.extra, old.name
+    profile.careers = old.careers
+    profile.stories, profile.full_name, profile.contacts = old.stories, old.full_name, old.contacts
+    if old.careers is not None:  # профессии уже выбраны по навыкам — резюме их не перебивает
+        profile.target_roles = old.target_roles
+        profile.search_mode, profile.search_skills = old.search_mode, old.search_skills
+    profile.search_queries = profile.effective_queries()
+    return profile
+
+
+def _merge(first: list[str], second: list[str]) -> list[str]:
+    result = list(first)
+    for item in second:
+        if not any(_norm(item) == _norm(x) for x in result):
+            result.append(item)
+    return result
 
 
 def load_profile(path: Path = PROFILE_PATH) -> Profile:
@@ -190,16 +216,8 @@ def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    profile = build_profile(read_resume(args.resume), PolzaLLM())
-    if PROFILE_PATH.exists() and not args.reset_preferences:
-        old = load_profile()
-        profile.preferences, profile.extra, profile.name = old.preferences, old.extra, old.name
-        profile.careers = old.careers
-        profile.stories, profile.full_name, profile.contacts = (
-            old.stories,
-            old.full_name,
-            old.contacts,
-        )
+    old = load_profile() if PROFILE_PATH.exists() and not args.reset_preferences else None
+    profile = rebuild_profile(read_resume(args.resume), old, PolzaLLM())
     save_profile(profile)
 
     print(f"Профиль сохранён: {PROFILE_PATH}")

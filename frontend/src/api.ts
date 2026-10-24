@@ -123,6 +123,58 @@ export interface Profile {
   careers: CareerSuggestions | null
 }
 
+export interface ResumeJob {
+  company: string
+  position: string
+  start: string
+  end: string
+  description: string
+}
+
+export interface ResumeStudy {
+  institution: string
+  faculty: string
+  specialty: string
+  year: string
+}
+
+export interface ResumeCourse {
+  name: string
+  organization: string
+  year: string
+}
+
+/** Анкета как на hh.ru. ФИО и контакты — в подписи профиля, здесь их нет. */
+export interface ResumeForm {
+  position: string
+  city: string
+  salary: string
+  work_format: string
+  about: string
+  skills: string[]
+  experience: ResumeJob[]
+  education: ResumeStudy[]
+  courses: ResumeCourse[]
+  languages: string
+}
+
+export interface ResumeSource {
+  kind: 'file' | 'link' | 'form'
+  name: string
+  updated_at: string
+  chars: number
+}
+
+export interface ResumeInfo {
+  source: ResumeSource | null
+  form: ResumeForm | null
+}
+
+export interface ResumeResult {
+  profile: Profile
+  source: ResumeSource
+}
+
 export interface RefreshState {
   running: boolean
   started_at: string | null
@@ -289,6 +341,20 @@ export const api = {
     request<Profile>('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }),
   suggestCareers: () => request<Profile>('/api/profile/careers', { method: 'POST' }),
   rebuildProfile: () => request<Profile>('/api/profile/rebuild', { method: 'POST' }),
+  resume: () => request<ResumeInfo>('/api/resume'),
+  uploadResume: (file: File) =>
+    request<ResumeResult>(`/api/resume/file?filename=${encodeURIComponent(file.name)}`, {
+      method: 'POST',
+      body: file,
+      headers: { 'Content-Type': 'application/octet-stream' },
+    }),
+  resumeByLink: (url: string) =>
+    request<ResumeResult>('/api/resume/link', { method: 'POST', body: JSON.stringify({ url }) }),
+  saveResumeForm: (form: ResumeForm) =>
+    request<ResumeInfo>('/api/resume/form', { method: 'PUT', body: JSON.stringify(form) }),
+  buildFromForm: (form: ResumeForm) =>
+    request<ResumeResult>('/api/resume/form/build', { method: 'POST', body: JSON.stringify(form) }),
+  prefillResumeForm: () => request<ResumeForm>('/api/resume/form/prefill', { method: 'POST' }),
   sources: () => request<Record<string, boolean>>('/api/sources'),
   refreshStatus: () => request<RefreshState>('/api/refresh'),
   refresh: (sources: string[]) =>
