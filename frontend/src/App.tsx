@@ -99,7 +99,7 @@ export default function App() {
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
                 <BriefcaseBusiness className="h-4.5 w-4.5" aria-hidden />
               </span>
-              <span className="hidden sm:inline">Job Matcher</span>
+              <span className="hidden sm:inline">Работа в точку</span>
             </a>
 
             {me && (

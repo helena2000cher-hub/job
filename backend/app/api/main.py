@@ -311,7 +311,7 @@ def create_app(
     providers = providers or {}
     limits = limits if limits is not None else get_settings().limits()
     public_url = public_url.rstrip("/")
-    app = FastAPI(title="Job Matcher API")
+    app = FastAPI(title="Работа в точку API")
     app.state.refresh = RefreshJob(engine, profile_path, runner)
 
     owner = Workspace(engine, profile_path, resume_path)
@@ -435,15 +435,16 @@ def create_app(
         token = need_accounts().issue_token(user, purpose)
         if purpose == "verify":
             link = f"{public_url}/api/auth/verify?token={token}"
-            subject = "Подтвердите почту — Job Matcher"
+            subject = "Подтвердите почту — Работа в точку"
             text = (
-                "Здравствуйте!\n\nЧтобы закончить регистрацию в Job Matcher, откройте ссылку:\n"
+                "Здравствуйте!\n\nЧтобы закончить регистрацию в «Работе в точку», "
+                "откройте ссылку:\n"
                 f"{link}\n\nСсылка действует 48 часов. Если вы не регистрировались — "
                 "просто удалите это письмо."
             )
         else:
             link = f"{public_url}/#/reset?token={token}"
-            subject = "Сброс пароля — Job Matcher"
+            subject = "Сброс пароля — Работа в точку"
             text = (
                 "Здравствуйте!\n\nЧтобы задать новый пароль, откройте ссылку:\n"
                 f"{link}\n\nСсылка действует 2 часа. Если вы не просили сброс — "
