@@ -187,11 +187,19 @@ export interface RefreshState {
 }
 
 export interface Me {
-  role: 'owner' | 'demo'
+  role: 'owner' | 'user' | 'demo'
   auth_enabled: boolean
   demo_available: boolean
   internals?: boolean // личный режим: показывать стоимость и названия сервисов
+  registration?: boolean // можно зарегистрироваться
+  providers?: Record<string, string> // вход одной кнопкой: { yandex: 'Яндекс ID', vk: 'VK ID' }
+  email?: string | null
+  name?: string
 }
+
+// Платные действия пользователя за сегодня: поиск, письма, разбор резюме…
+export type LimitAction = 'refresh' | 'letter' | 'resume' | 'careers' | 'advice' | 'manual'
+export type Limits = Partial<Record<LimitAction, { used: number; limit: number }>>
 
 export class ApiError extends Error {
   status: number
@@ -302,9 +310,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   me: () => request<Me>('/api/auth/me'),
-  login: (password: string) =>
-    request<Me>('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  login: (password: string, email = '') =>
+    request<Me>('/api/auth/login', { method: 'POST', body: JSON.stringify({ password, email }) }),
   logout: () => fetch('/api/auth/logout', { method: 'POST' }),
+  register: (email: string, password: string, consent: boolean) =>
+    request<{ status: string; email: string }>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, consent }),
+    }),
+  forgotPassword: (email: string) =>
+    request<{ status: string }>('/api/auth/forgot', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (token: string, password: string) =>
+    request<Me>('/api/auth/reset', { method: 'POST', body: JSON.stringify({ token, password }) }),
+  deleteAccount: async () => {
+    const response = await fetch('/api/auth/account', { method: 'DELETE' })
+    if (!response.ok) throw new ApiError(response.status, 'Не удалось удалить аккаунт')
+  },
+  limits: () => request<Limits>('/api/limits'),
   feed: (params: { minScore: number; source: string; view: FeedView }) => {
     const query = new URLSearchParams({ min_score: String(params.minScore), view: params.view })
     if (params.source) query.set('source', params.source)

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { api } from '../api'
 import type { Application, Stage, Tone } from '../api'
 import { useIsDemo } from '../session'
+import { LimitHint } from './LimitHint'
 import { STAGES } from '../stages'
 import { Button, Spinner } from './ui'
 
@@ -215,6 +216,7 @@ export function CoverLetter({ vacancyId, application, onChange }: Props) {
           {busy ? <Spinner /> : <Sparkles className="h-4 w-4" />}
           {letter ? 'Написать заново' : 'Создать сопроводительное письмо'}
         </Button>
+        <LimitHint action="letter" refreshKey={letter} />
       </div>
       {busy && <p className="text-xs text-slate-500">Нейросеть пишет письмо, это займёт до минуты…</p>}
 

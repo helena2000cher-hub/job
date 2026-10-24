@@ -35,6 +35,36 @@ class Settings(BaseSettings):
     # Коммерческий режим: интерфейс не показывает стоимость и названия внутренних сервисов
     public_mode: bool = False
 
+    # Регистрация пользователей (нужен включённый вход: APP_PASSWORD и SESSION_SECRET)
+    registration_enabled: bool = True
+    public_url: str = "http://localhost:8000"  # адрес сайта — для ссылок в письмах и OAuth
+    yandex_client_id: str = ""  # https://oauth.yandex.ru/client/new
+    yandex_client_secret: str = ""
+    vk_client_id: str = ""  # https://id.vk.ru/about/business — кабинет VK ID
+    smtp_host: str = ""  # пусто — письма пишутся в лог сервера
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    # Платные действия пользователя в день (владелец без лимитов)
+    limit_refresh: int = 1
+    limit_letter: int = 5
+    limit_resume: int = 2
+    limit_careers: int = 2
+    limit_advice: int = 1
+    limit_manual: int = 10  # «+ Добавить отклик» по ссылке подтягивает вакансию через Exa
+    max_parallel_searches: int = 2  # поисков пользователей одновременно
+
+    def limits(self) -> dict[str, int]:
+        return {
+            "refresh": self.limit_refresh,
+            "letter": self.limit_letter,
+            "resume": self.limit_resume,
+            "careers": self.limit_careers,
+            "advice": self.limit_advice,
+            "manual": self.limit_manual,
+        }
+
 
 @lru_cache
 def get_settings() -> Settings:

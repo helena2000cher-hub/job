@@ -30,8 +30,9 @@ def test_token_roundtrip_and_tampering():
     auth = Auth(PASSWORD, SECRET)
     token = auth.issue()
     assert auth.verify(token)
-    expires, sig = token.split(".")
-    assert not auth.verify(f"{int(expires) + 1000}.{sig}")  # продлить срок подделкой нельзя
+    expires, payload, sig = token.split(".")
+    assert not auth.verify(f"{int(expires) + 1000}.{payload}.{sig}")  # продлить срок нельзя
+    assert not auth.verify(f"{expires}.u1v0.{sig}")  # подменить, кто вошёл, — тоже
     assert not auth.verify(token[:-1] + ("0" if token[-1] != "0" else "1"))
     assert not auth.verify(None)
     assert not auth.verify("garbage")
@@ -103,6 +104,10 @@ def test_guest_sees_only_demo(site):
         "auth_enabled": True,
         "demo_available": True,
         "internals": True,
+        "registration": False,
+        "providers": {},
+        "email": None,
+        "name": "",
     }
     titles = [i["title"] for i in guest.get("/api/feed").json()["items"]]
     assert titles and "Секретная вакансия владельца" not in titles

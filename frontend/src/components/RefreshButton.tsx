@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { RefreshState } from '../api'
 import { useInternals } from '../session'
+import { LimitHint } from './LimitHint'
 import { Button, Spinner } from './ui'
 
 const SOURCES = [
@@ -145,6 +146,9 @@ export function RefreshButton({ onDone }: { onDone: () => void }) {
               <Button variant="primary" className="mt-3 w-full" onClick={start}>
                 {selected.length === 0 ? 'Пересчитать оценки' : 'Найти и оценить'}
               </Button>
+              <p className="mt-1.5 text-center">
+                <LimitHint action="refresh" refreshKey={pollRun} />
+              </p>
             </>
           )}
 

@@ -1,25 +1,41 @@
 """Web API for the UI. Run: uvicorn app.api.main:app --reload (from backend/).
 
-Every request works in a workspace: the owner's (valid session cookie) or the public demo sandbox.
+Every request works in a workspace: the owner's, a registered user's (each in its own folder
+data/users/<id>/) or the public demo sandbox — chosen by the session cookie.
 """
 
 import hashlib
 import logging
+import shutil
+import threading
 from collections import Counter
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from dataclasses import field as dc_field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
+import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, create_engine, func, select
 
+from app.accounts import AccountError, Accounts, User
 from app.advice import Advice, generate_advice, load_advice, save_advice
-from app.api.auth import COOKIE_NAME, SESSION_DAYS, Auth
+from app.api.auth import (
+    COOKIE_NAME,
+    OAUTH_COOKIE,
+    OWNER,
+    SESSION_DAYS,
+    Attempts,
+    Auth,
+    parse_user_payload,
+    user_payload,
+)
 from app.api.refresh import RefreshJob, RefreshState, Runner, default_runner
 from app.careers import suggest_careers
 from app.collectors import COLLECTORS
@@ -29,7 +45,9 @@ from app.cover_letter import Tone, generate_cover_letter
 from app.db import get_engine, init_db
 from app.demo import DemoResetter
 from app.llm import LLM, PolzaLLM
+from app.mailer import LogMailer, Mailer, SmtpMailer
 from app.models import SENT_STAGES, STAGES, Application, Match, Vacancy, VacancyMark, utcnow
+from app.oauth import VK, OAuthError, Provider, Yandex, http_client, new_verifier
 from app.profile import PROFILE_PATH, RESUME_PATH, Profile, rebuild_profile, save_profile
 from app.resume import (
     MAX_UPLOAD_BYTES,
@@ -161,13 +179,38 @@ class CoverLetterIn(BaseModel):
 
 class LoginIn(BaseModel):
     password: str
+    email: str = ""  # пусто — вход владельца по паролю из .env
+
+
+class RegisterIn(BaseModel):
+    email: str
+    password: str
+    consent: bool = False  # согласие на обработку персональных данных (152-ФЗ)
+
+
+class ForgotIn(BaseModel):
+    email: str
+
+
+class ResetIn(BaseModel):
+    token: str
+    password: str
 
 
 class Me(BaseModel):
-    role: Literal["owner", "demo"]
+    role: Literal["owner", "user", "demo"]
     auth_enabled: bool
     demo_available: bool
     internals: bool = True  # показывать стоимость и сервисы (личный режим); False — для клиентов
+    registration: bool = False  # можно зарегистрироваться
+    providers: dict[str, str] = {}  # вход одной кнопкой: {"yandex": "Яндекс ID", ...}
+    email: str | None = None
+    name: str = ""
+
+
+class Limit(BaseModel):
+    used: int
+    limit: int
 
 
 @dataclass(frozen=True)
@@ -176,6 +219,7 @@ class Workspace:
     profile_path: Path
     resume_path: Path
     demo: bool = False
+    user: User | None = dc_field(default=None, compare=False)  # None — владелец или демо
 
 
 class ResumeOut(BaseModel):
@@ -248,11 +292,25 @@ def create_app(
     demo_profile_path: Path | None = None,
     demo_reset_hours: float = 0,
     cookie_secure: bool = False,
+    accounts: Accounts | None = None,
+    users_dir: Path = DATA_DIR / "users",
+    mailer: Mailer | None = None,
+    providers: dict[str, Provider] | None = None,
+    oauth_client: Callable[[], httpx.Client] = http_client,
+    public_url: str = "http://localhost:8000",
+    limits: dict[str, int] | None = None,
+    max_parallel_searches: int = 2,
 ) -> FastAPI:
     engine = engine or get_engine()
     init_db(engine)
     _migrate_saved_marks(engine)
     auth = auth or Auth("", "")  # по умолчанию вход выключен: локально все — владелец
+    if not auth.enabled:
+        accounts = None  # без входа владельца нельзя отличить пользователя от владельца
+    mailer = mailer or LogMailer()
+    providers = providers or {}
+    limits = limits if limits is not None else get_settings().limits()
+    public_url = public_url.rstrip("/")
     app = FastAPI(title="Job Matcher API")
     app.state.refresh = RefreshJob(engine, profile_path, runner)
 
@@ -262,9 +320,42 @@ def create_app(
         demo = Workspace(demo_engine, demo_profile_path, DATA_DIR / "-no-demo-resume-", demo=True)
         app.state.demo = DemoResetter(demo_engine, demo_profile_path, demo_reset_hours)
 
+    # Пользователи: у каждого своя папка с базой, профилем и резюме; поиск — свой RefreshJob.
+    user_engines: dict[int, Engine] = {}
+    user_jobs: dict[int, RefreshJob] = {}
+    users_lock = threading.Lock()
+
+    def user_workspace(user: User) -> Workspace:
+        folder = users_dir / str(user.id)
+        with users_lock:
+            if user.id not in user_engines:
+                folder.mkdir(parents=True, exist_ok=True)
+                user_engine = create_engine(
+                    f"sqlite:///{(folder / 'jobs.db').as_posix()}",
+                    connect_args={"check_same_thread": False},
+                )
+                init_db(user_engine)
+                user_engines[user.id] = user_engine
+                user_jobs[user.id] = RefreshJob(user_engine, folder / "profile.json", runner)
+            return Workspace(
+                user_engines[user.id], folder / "profile.json", folder / "resume.pdf", user=user
+            )
+
+    def refresh_job(request: Request, ws: Workspace) -> RefreshJob:
+        return user_jobs[ws.user.id] if ws.user else request.app.state.refresh
+
+    def current_user(request: Request) -> User | None:
+        parsed = parse_user_payload(auth.read(request.cookies.get(COOKIE_NAME)))
+        if accounts is None or parsed is None:
+            return None
+        user = accounts.get(parsed[0])
+        return user if user and user.session_version == parsed[1] else None
+
     def workspace(request: Request) -> Workspace:
         if auth.verify(request.cookies.get(COOKIE_NAME)):
             return owner
+        if user := current_user(request):
+            return user_workspace(user)
         if demo is not None:
             return demo
         raise HTTPException(401, "Нужно войти")
@@ -277,6 +368,13 @@ def create_app(
         return ws
 
     OwnerDep = Annotated[Workspace, Depends(owner_only)]
+
+    def charge(ws: Workspace, action: str) -> None:
+        """Count a paid action against the user's daily limit; the owner has no limits."""
+        if ws.user is None or accounts is None:
+            return
+        if not accounts.use(ws.user.id, action, limits.get(action, 0)):
+            raise HTTPException(429, "Лимит на сегодня исчерпан — попробуйте завтра")
 
     def session(ws: WsDep) -> Iterator[Session]:
         with Session(ws.engine) as s:
@@ -293,46 +391,212 @@ def create_app(
     def health():
         return {"status": "ok"}
 
-    @app.get("/api/auth/me", response_model=Me)
-    def me(ws: WsDep):
+    def me_for(ws: Workspace) -> Me:
+        role = "demo" if ws.demo else ("user" if ws.user else "owner")
         return Me(
-            role="demo" if ws.demo else "owner",
+            role=role,
             auth_enabled=auth.enabled,
             demo_available=demo is not None,
-            internals=not public_mode,
+            internals=not public_mode and role != "user",  # клиентам — без стоимости
+            registration=accounts is not None,
+            providers={name: p.title for name, p in providers.items()} if accounts else {},
+            email=ws.user.email if ws.user else None,
+            name=ws.user.name if ws.user else "",
         )
 
-    @app.post("/api/auth/login", response_model=Me)
-    def login(body: LoginIn, request: Request, response: Response):
-        if not auth.enabled:
-            return Me(
-                role="owner", auth_enabled=False, demo_available=False, internals=not public_mode
-            )
-        client = request.client.host if request.client else "?"
-        if auth.is_blocked(client):
-            raise HTTPException(429, "Слишком много попыток. Подождите 5 минут")
-        if not auth.check_password(body.password):
-            auth.record_failure(client)
-            raise HTTPException(401, "Неверный пароль")
-        auth.reset_failures(client)
+    def set_session(response: Response, payload: str) -> None:
         response.set_cookie(
             COOKIE_NAME,
-            auth.issue(),
+            auth.issue(payload),
             max_age=SESSION_DAYS * 86400,
             httponly=True,
             secure=cookie_secure,
             samesite="lax",
         )
-        return Me(
-            role="owner",
-            auth_enabled=True,
-            demo_available=demo is not None,
-            internals=not public_mode,
-        )
+
+    def log_in_user(response: Response, user: User) -> Me:
+        set_session(response, user_payload(user.id, user.session_version))
+        return me_for(user_workspace(user))
+
+    def client_ip(request: Request) -> str:
+        return request.client.host if request.client else "?"
+
+    def need_accounts() -> Accounts:
+        if accounts is None:
+            raise HTTPException(404, "Регистрация на этом сайте выключена")
+        return accounts
+
+    mail_attempts = Attempts(5, 3600)  # писем с одного адреса в час — против спама чужим людям
+
+    def send_link(request: Request, user: User, purpose: str) -> None:
+        if mail_attempts.is_blocked(client_ip(request)):
+            raise HTTPException(429, "Слишком много писем. Попробуйте через час")
+        mail_attempts.record(client_ip(request))
+        token = need_accounts().issue_token(user, purpose)
+        if purpose == "verify":
+            link = f"{public_url}/api/auth/verify?token={token}"
+            subject = "Подтвердите почту — Job Matcher"
+            text = (
+                "Здравствуйте!\n\nЧтобы закончить регистрацию в Job Matcher, откройте ссылку:\n"
+                f"{link}\n\nСсылка действует 48 часов. Если вы не регистрировались — "
+                "просто удалите это письмо."
+            )
+        else:
+            link = f"{public_url}/#/reset?token={token}"
+            subject = "Сброс пароля — Job Matcher"
+            text = (
+                "Здравствуйте!\n\nЧтобы задать новый пароль, откройте ссылку:\n"
+                f"{link}\n\nСсылка действует 2 часа. Если вы не просили сброс — "
+                "ничего делать не нужно, пароль останется прежним."
+            )
+        try:
+            mailer.send(user.email or "", subject, text)
+        except Exception as exc:
+            log.exception("mail to user %s failed", user.id)
+            raise HTTPException(502, "Не удалось отправить письмо — попробуйте позже") from exc
+
+    @app.get("/api/auth/me", response_model=Me)
+    def me(ws: WsDep):
+        return me_for(ws)
+
+    @app.post("/api/auth/login", response_model=Me)
+    def login(body: LoginIn, request: Request, response: Response):
+        if not auth.enabled:
+            return me_for(owner)
+        client = client_ip(request)
+        if auth.is_blocked(client):
+            raise HTTPException(429, "Слишком много попыток. Подождите 5 минут")
+        if body.email.strip():
+            user = need_accounts().authenticate(body.email, body.password)
+            if user is None:
+                auth.record_failure(client)
+                raise HTTPException(401, "Неверная почта или пароль")
+            auth.reset_failures(client)
+            if not user.email_verified:
+                send_link(request, user, "verify")
+                raise HTTPException(403, "Почта не подтверждена — мы отправили письмо ещё раз")
+            return log_in_user(response, user)
+        if not auth.check_password(body.password):
+            auth.record_failure(client)
+            raise HTTPException(401, "Неверный пароль")
+        auth.reset_failures(client)
+        set_session(response, OWNER)
+        return me_for(owner)
 
     @app.post("/api/auth/logout", status_code=204)
     def logout(response: Response):
         response.delete_cookie(COOKIE_NAME)
+
+    @app.post("/api/auth/register")
+    def register(body: RegisterIn, request: Request):
+        """Аккаунт создаётся неподтверждённым; войти можно после ссылки из письма."""
+        if not body.consent:
+            raise HTTPException(400, "Нужно согласие на обработку персональных данных")
+        try:
+            user = need_accounts().register(body.email, body.password)
+        except AccountError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        send_link(request, user, "verify")
+        return {"status": "sent", "email": user.email}
+
+    @app.get("/api/auth/verify")
+    def verify_email(token: str):
+        try:
+            user = need_accounts().verify_email(token)
+        except AccountError:
+            return RedirectResponse("/#/login?error=link", status_code=303)
+        response = RedirectResponse("/#/profile", status_code=303)
+        log_in_user(response, user)
+        return response
+
+    @app.post("/api/auth/forgot")
+    def forgot(body: ForgotIn, request: Request):
+        """Ответ одинаковый, есть такая почта или нет — чтобы не выдавать чужие адреса."""
+        user = need_accounts().find_by_email(body.email)
+        if user is not None:
+            send_link(request, user, "reset")
+        return {"status": "sent"}
+
+    @app.post("/api/auth/reset", response_model=Me)
+    def reset(body: ResetIn, response: Response):
+        try:
+            user = need_accounts().reset_password(body.token, body.password)
+        except AccountError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return log_in_user(response, user)
+
+    @app.delete("/api/auth/account", status_code=204)
+    def delete_account(ws: WsDep, response: Response):
+        """Удалить аккаунт и все данные пользователя: резюме, профиль, отклики."""
+        if ws.user is None:
+            raise HTTPException(403, "Удалить можно только аккаунт пользователя")
+        with users_lock:
+            if user_engine := user_engines.pop(ws.user.id, None):
+                user_engine.dispose()  # иначе Windows не даст удалить jobs.db
+            user_jobs.pop(ws.user.id, None)
+        shutil.rmtree(users_dir / str(ws.user.id), ignore_errors=True)
+        need_accounts().delete(ws.user.id)
+        response.delete_cookie(COOKIE_NAME)
+
+    @app.get("/api/auth/oauth/{provider}/start")
+    def oauth_start(provider: str):
+        if accounts is None or provider not in providers:
+            raise HTTPException(404, "Такой способ входа не подключён")
+        state, verifier = new_verifier()[:32], new_verifier()
+        redirect_uri = f"{public_url}/api/auth/oauth/{provider}/callback"
+        response = RedirectResponse(
+            providers[provider].authorize_url(redirect_uri, state, verifier), status_code=303
+        )
+        # state и verifier — в подписанной cookie на 10 минут: защита от подделки ответа
+        response.set_cookie(
+            OAUTH_COOKIE,
+            auth.issue(f"{provider}~{state}~{verifier}", seconds=600),
+            max_age=600,
+            httponly=True,
+            secure=cookie_secure,
+            samesite="lax",
+        )
+        return response
+
+    @app.get("/api/auth/oauth/{provider}/callback")
+    def oauth_callback(provider: str, request: Request):
+        fail = RedirectResponse("/#/login?error=oauth", status_code=303)
+        fail.delete_cookie(OAUTH_COOKIE)
+        params = dict(request.query_params)
+        saved = auth.read(request.cookies.get(OAUTH_COOKIE)) or ""
+        name, _, rest = saved.partition("~")
+        state, _, verifier = rest.partition("~")
+        if (
+            accounts is None
+            or provider not in providers
+            or name != provider
+            or not state
+            or params.get("state") != state
+            or not params.get("code")
+        ):
+            return fail
+        redirect_uri = f"{public_url}/api/auth/oauth/{provider}/callback"
+        try:
+            with oauth_client() as client:
+                found = providers[provider].fetch_user(
+                    client, params["code"], verifier, redirect_uri, params
+                )
+        except (OAuthError, httpx.HTTPError, KeyError) as exc:
+            log.warning("oauth %s failed: %s", provider, exc)
+            return fail
+        user = accounts.oauth_login(provider, found.subject, found.email, found.name)
+        response = RedirectResponse("/#/feed", status_code=303)
+        response.delete_cookie(OAUTH_COOKIE)
+        log_in_user(response, user)
+        return response
+
+    @app.get("/api/limits", response_model=dict[str, Limit])
+    def get_limits(ws: WsDep):
+        """Сколько платных действий осталось сегодня (только у пользователей)."""
+        if ws.user is None or accounts is None:
+            return {}
+        used = accounts.used_today(ws.user.id)
+        return {a: Limit(used=used.get(a, 0), limit=n) for a, n in limits.items()}
 
     @app.get("/api/feed", response_model=Feed)
     def feed(
@@ -450,6 +714,7 @@ def create_app(
         vacancy = s.get(Vacancy, ident.id) if ident else None
         fetched = vacancy is not None
         if vacancy is None and url:
+            charge(ws, "manual")
             try:
                 vacancy = vacancy_fetcher(url)
             except Exception as exc:  # сеть, лимиты Exa — не повод терять отклик
@@ -506,6 +771,7 @@ def create_app(
         profile = current_profile(ws)
         if profile is None:
             raise HTTPException(400, "Сначала создайте профиль")
+        charge(ws, "letter")
         letter = generate_cover_letter(
             profile,
             vacancy,
@@ -546,6 +812,7 @@ def create_app(
         profile = current_profile(ws)
         if profile is None:
             raise HTTPException(400, "Сначала создайте профиль")
+        charge(ws, "careers")
         try:
             profile.careers = suggest_careers(
                 profile.skills,
@@ -575,6 +842,7 @@ def create_app(
             raise HTTPException(
                 400, "Резюме ещё нет: загрузите файл, дайте ссылку или заполните анкету"
             )
+        charge(ws, "resume")
         return rebuild_from(ws, text)
 
     @app.get("/api/resume", response_model=ResumeOut)
@@ -592,12 +860,14 @@ def create_app(
             text = extract_text(data, filename)
         except ResumeError as exc:
             raise HTTPException(400, str(exc)) from exc
+        charge(ws, "resume")
         profile = rebuild_from(ws, text)
         source = ResumeStore(ws.resume_path).save_text(text, "file", Path(filename).name)
         return ResumeResult(profile=profile, source=source)
 
     @app.post("/api/resume/link", response_model=ResumeResult)
     def resume_by_link(body: ResumeLinkIn, ws: OwnerDep):
+        charge(ws, "resume")
         try:
             text = resume_fetcher(body.url)
         except ResumeError as exc:
@@ -620,6 +890,7 @@ def create_app(
             raise HTTPException(400, "Анкета почти пустая: добавьте опыт работы и навыки")
         store = ResumeStore(ws.resume_path)
         store.save_form(form)
+        charge(ws, "resume")
         profile = rebuild_from(ws, text)
         return ResumeResult(profile=profile, source=store.save_text(text, "form", "Анкета"))
 
@@ -629,6 +900,7 @@ def create_app(
         text = ResumeStore(ws.resume_path).text()
         if not text:
             raise HTTPException(400, "Резюме ещё нет — заполните анкету вручную")
+        charge(ws, "resume")
         return form_from_text(text, llm_factory())
 
     def advice_path(ws: Workspace) -> Path:
@@ -648,6 +920,7 @@ def create_app(
         if profile is None:
             raise HTTPException(400, "Сначала создайте профиль")
         mark_no_response(s)
+        charge(ws, "advice")
         advice = generate_advice(
             profile, compute_analytics(s, profile.fingerprint()), llm_factory()
         )
@@ -673,8 +946,8 @@ def create_app(
     def refresh_status(request: Request, ws: WsDep):
         if ws.demo:
             return RefreshState().to_dict()  # журнал владельца гостям не показываем
-        state = request.app.state.refresh.state.to_dict()
-        if public_mode:
+        state = refresh_job(request, ws).state.to_dict()
+        if public_mode or ws.user:
             state["cost_dollars"] = 0  # стоимость — внутренняя кухня, клиентам не показываем
         return state
 
@@ -688,9 +961,18 @@ def create_app(
             raise HTTPException(400, f"Для источника {', '.join(missing)} нет ключа в .env")
         if current_profile(ws) is None:
             raise HTTPException(400, "Сначала создайте профиль")
-        if not request.app.state.refresh.start(body.sources):
+        job = refresh_job(request, ws)
+        if job.state.running:
             raise HTTPException(409, "Обновление уже идёт")
-        return request.app.state.refresh.state.to_dict()
+        if ws.user and sum(j.state.running for j in user_jobs.values()) >= max_parallel_searches:
+            raise HTTPException(409, "Сейчас идёт много поисков — попробуйте через пару минут")
+        charge(ws, "refresh")
+        if not job.start(body.sources):
+            raise HTTPException(409, "Обновление уже идёт")
+        state = job.state.to_dict()
+        if public_mode or ws.user:
+            state["cost_dollars"] = 0  # стоимость — внутренняя кухня, клиентам не показываем
+        return state
 
     # Собранный фронтенд (npm run build) отдаётся тем же сервером — один процесс для деплоя.
     if serve_frontend and FRONTEND_DIST.exists():
@@ -709,6 +991,28 @@ def create_app_from_settings() -> FastAPI:
             f"sqlite:///{(DATA_DIR / 'demo.db').as_posix()}",
             connect_args={"check_same_thread": False},
         )
+    accounts = None
+    if auth.enabled and settings.registration_enabled:
+        accounts = Accounts(
+            create_engine(
+                f"sqlite:///{(DATA_DIR / 'accounts.db').as_posix()}",
+                connect_args={"check_same_thread": False},
+            )
+        )
+    providers: dict[str, Provider] = {}
+    if settings.yandex_client_id:
+        providers["yandex"] = Yandex(settings.yandex_client_id, settings.yandex_client_secret)
+    if settings.vk_client_id:
+        providers["vk"] = VK(settings.vk_client_id)
+    mailer: Mailer = LogMailer()
+    if settings.smtp_host:
+        mailer = SmtpMailer(
+            settings.smtp_host,
+            settings.smtp_port,
+            settings.smtp_user,
+            settings.smtp_password,
+            settings.smtp_from,
+        )
     return create_app(
         auth=auth,
         demo_engine=demo_engine,
@@ -716,6 +1020,12 @@ def create_app_from_settings() -> FastAPI:
         demo_reset_hours=settings.demo_reset_hours,
         cookie_secure=settings.cookie_secure,
         public_mode=settings.public_mode,
+        accounts=accounts,
+        mailer=mailer,
+        providers=providers,
+        public_url=settings.public_url,
+        limits=settings.limits(),
+        max_parallel_searches=settings.max_parallel_searches,
     )
 
 

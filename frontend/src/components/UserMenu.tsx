@@ -1,23 +1,38 @@
-import { LogIn, LogOut, UserRound } from 'lucide-react'
+import { LogIn, LogOut, Trash2, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 interface Props {
   name: string
   headline: string
+  email: string
   isDemo: boolean
+  canRegister: boolean // гость в демо может зарегистрироваться
   canLogout: boolean
   active: boolean // открыта страница профиля
   onProfile: () => void
   onLogin: () => void
   onLogout: () => void
+  onDeleteAccount?: () => void // только у пользователя: удалить аккаунт и данные
 }
 
 /** Кружок пользователя справа в шапке и выпадающее меню: профиль, вход/выход. */
-export function UserMenu({ name, headline, isDemo, canLogout, active, onProfile, onLogin, onLogout }: Props) {
+export function UserMenu({
+  name,
+  headline,
+  email,
+  isDemo,
+  canRegister,
+  canLogout,
+  active,
+  onProfile,
+  onLogin,
+  onLogout,
+  onDeleteAccount,
+}: Props) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
-  const initial = name.trim().charAt(0).toUpperCase()
+  const initial = (name.trim() || email).charAt(0).toUpperCase()
 
   useEffect(() => {
     if (!open) return
@@ -62,7 +77,8 @@ export function UserMenu({ name, headline, isDemo, canLogout, active, onProfile,
           className="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
         >
           <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{name || 'Без имени'}</p>
+            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{name || email || 'Без имени'}</p>
+            {email && name && <p className="truncate text-xs text-slate-500 dark:text-slate-400">{email}</p>}
             {headline && <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{headline}</p>}
           </div>
           <div className="p-1.5">
@@ -71,12 +87,17 @@ export function UserMenu({ name, headline, isDemo, canLogout, active, onProfile,
             </MenuItem>
             {isDemo && (
               <MenuItem icon={<LogIn className="h-4 w-4" />} onClick={pick(onLogin)}>
-                Войти как владелец
+                {canRegister ? 'Войти или зарегистрироваться' : 'Войти как владелец'}
               </MenuItem>
             )}
             {canLogout && (
               <MenuItem icon={<LogOut className="h-4 w-4" />} onClick={pick(onLogout)}>
                 Выйти
+              </MenuItem>
+            )}
+            {onDeleteAccount && (
+              <MenuItem icon={<Trash2 className="h-4 w-4" />} onClick={pick(onDeleteAccount)}>
+                Удалить аккаунт
               </MenuItem>
             )}
           </div>

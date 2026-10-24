@@ -4,7 +4,8 @@ import { ApiError, api } from './api'
 import type { Me } from './api'
 import { AnalyticsPage } from './components/AnalyticsPage'
 import { FeedPage } from './components/FeedPage'
-import { LoginPage } from './components/LoginPage'
+import { LoginPage, ResetPasswordPage } from './components/LoginPage'
+import { PrivacyPage } from './components/PrivacyPage'
 import { ProfilePage } from './components/ProfilePage'
 import { RefreshButton } from './components/RefreshButton'
 import { TrackerPage } from './components/TrackerPage'
@@ -12,7 +13,7 @@ import { UserMenu } from './components/UserMenu'
 import { Spinner } from './components/ui'
 import { SessionContext } from './session'
 
-type Tab = 'feed' | 'tracker' | 'analytics' | 'profile' | 'login'
+type Tab = 'feed' | 'tracker' | 'analytics' | 'profile' | 'login' | 'reset' | 'privacy'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'feed', label: 'Вакансии' },
@@ -21,8 +22,8 @@ const TABS: { id: Tab; label: string }[] = [
 ]
 
 function tabFromHash(): Tab {
-  const tab = window.location.hash.replace('#/', '')
-  const known: Tab[] = ['tracker', 'analytics', 'profile', 'login']
+  const tab = window.location.hash.replace('#/', '').split('?')[0] // #/reset?token=…
+  const known: Tab[] = ['tracker', 'analytics', 'profile', 'login', 'reset', 'privacy']
   return known.includes(tab as Tab) ? (tab as Tab) : 'feed'
 }
 
@@ -74,7 +75,20 @@ export default function App() {
 
   const me = session.status === 'ready' ? session.me : null
   const isDemo = me?.role === 'demo'
-  const showLogin = session.status === 'login' || tab === 'login'
+  const isUser = me?.role === 'user'
+  const standalone = tab === 'reset' || tab === 'privacy' // открываются и без входа
+  const showLogin = !standalone && (session.status === 'login' || tab === 'login')
+
+  const deleteAccount = async () => {
+    if (!window.confirm('Удалить аккаунт? Резюме, профиль, вакансии и отклики удалятся безвозвратно.')) return
+    try {
+      await api.deleteAccount()
+      window.location.hash = '#/feed'
+      window.location.reload()
+    } catch (e) {
+      window.alert((e as Error).message)
+    }
+  }
 
   return (
     <SessionContext.Provider value={me ?? { role: 'demo', auth_enabled: true, demo_available: false }}>
@@ -118,13 +132,16 @@ export default function App() {
               >
                 {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </button>
-              {me?.role === 'owner' && <RefreshButton onDone={() => setReloadKey((k) => k + 1)} />}
+              {(me?.role === 'owner' || isUser) && <RefreshButton onDone={() => setReloadKey((k) => k + 1)} />}
               {me && (
                 <UserMenu
                   name={person.name}
                   headline={person.headline}
+                  email={me.email ?? ''}
                   isDemo={isDemo}
-                  canLogout={me.role === 'owner' && me.auth_enabled}
+                  canRegister={isDemo && (me.registration ?? false)}
+                  canLogout={(me.role === 'owner' && me.auth_enabled) || isUser}
+                  onDeleteAccount={isUser ? deleteAccount : undefined}
                   active={tab === 'profile'}
                   onProfile={() => go('profile')}
                   onLogin={() => go('login')}
@@ -140,7 +157,18 @@ export default function App() {
             <p className="mx-auto max-w-6xl px-4 py-2.5 text-sm">
               <strong className="font-semibold">Демо-режим.</strong> Кандидат, компании и вакансии вымышлены.
               Можно листать ленту, открывать разборы и двигать карточки в трекере — песочница периодически
-              сбрасывается. Сбор вакансий и генерация писем доступны только владельцу.{' '}
+              сбрасывается.{' '}
+              {me?.registration ? (
+                <>
+                  Чтобы искать вакансии под своё резюме,{' '}
+                  <a href="#/login" className="font-medium underline">
+                    зарегистрируйтесь
+                  </a>
+                  .{' '}
+                </>
+              ) : (
+                'Сбор вакансий и генерация писем доступны только владельцу. '
+              )}
               <a href="https://github.com/helena2000cher-hub/job" className="font-medium underline" target="_blank" rel="noreferrer">
                 Код на GitHub
               </a>
@@ -164,9 +192,11 @@ export default function App() {
             </div>
           )}
           {showLogin && session.status !== 'loading' && (
-            <LoginPage canGoBack={me !== null} onBack={() => go('feed')} />
+            <LoginPage me={me} canGoBack={me !== null} onBack={() => go('feed')} />
           )}
-          {me && !showLogin && (
+          {tab === 'reset' && session.status !== 'loading' && <ResetPasswordPage />}
+          {tab === 'privacy' && <PrivacyPage />}
+          {me && !showLogin && !standalone && (
             <>
               {tab === 'feed' && <FeedPage reloadKey={reloadKey} onGoToProfile={() => go('profile')} />}
               {tab === 'tracker' && <TrackerPage onGoToFeed={() => go('feed')} />}
