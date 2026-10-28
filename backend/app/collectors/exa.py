@@ -2,7 +2,8 @@
 hh.ru (API closed since 2026), Хабр Карьера and companies' own career pages.
 
 Exa extracts structured fields itself (`contents.summary.schema`), so no extra LLM call is needed.
-Cost: ~$0.007 per search + $0.001 per summary → ~$0.02 per query and site with 10 results.
+Two steps to save money: a search without contents (~$0.007), then /contents with the summary
+(~$0.001 per page) only for links that are not in the database yet.
 Docs: https://exa.ai/docs/reference/search
 """
 
@@ -110,6 +111,7 @@ class ExaCollector(Collector):
         results_per_site: int = 10,
         max_age_days: int = 30,
         client: httpx.Client | None = None,
+        known_ids: set[str] | None = None,
     ) -> None:
         api_key = get_settings().exa_api_key
         if client is None and not api_key:
@@ -118,19 +120,32 @@ class ExaCollector(Collector):
         self._sites = [SITES[s] for s in (sites or list(SITES))]
         self._results_per_site = results_per_site
         self._max_age_days = max_age_days
+        # Вакансии, которые уже есть в базе: за их выжимку повторно не платим
+        self._known = known_ids if known_ids is not None else set()
         self.cost_dollars = 0.0
         self.skipped = 0
+        self.already_known = 0
 
     def fetch(self, query: SearchQuery) -> Iterator[Vacancy]:
         if not query.text:
             raise ValueError("Exa ищет по смыслу — нужен текст запроса")
         yielded = 0
         for site in self._sites:
+            new: dict[str, str] = {}  # id вакансии → ссылка из выдачи
             for result in self._search(site, query):
+                ident = identify(result.get("url") or "", site)
+                if ident is None:  # списки вакансий, статьи — не карточка вакансии
+                    self.skipped += 1
+                elif ident.id in self._known:
+                    self.already_known += 1
+                else:
+                    new.setdefault(ident.id, result["url"])
+            for result in self._contents(site, new):
                 vacancy = parse_result(result, site)
                 if vacancy is None or (query.remote_only and not vacancy.is_remote):
                     self.skipped += 1
                     continue
+                self._known.add(vacancy.id)  # следующий запрос эту вакансию уже не оплачивает
                 yield vacancy
                 yielded += 1
                 if yielded >= query.limit:
@@ -147,17 +162,35 @@ class ExaCollector(Collector):
             "numResults": min(self._results_per_site, query.limit),
             "userLocation": "RU",
             "startPublishedDate": since.strftime("%Y-%m-%dT00:00:00Z"),
-            "contents": {
-                "text": {"maxCharacters": 4000},
-                "summary": {"schema": SUMMARY_SCHEMA},
-            },
+            "contents": {"text": False},  # только ссылки; текст и выжимка — в _contents
         }
         if site.include_domains:
             body["includeDomains"] = list(site.include_domains)
         else:
             body["excludeDomains"] = AGGREGATORS
+        return self._post(API_URL, body)
 
-        response = self._client.post(API_URL, json=body)
+    def _contents(self, site: Site, new: dict[str, str]) -> list[dict[str, Any]]:
+        """Text and structured summary for new links only, in one request."""
+        if not new:
+            return []
+        results = self._post(
+            CONTENTS_URL,
+            {
+                "urls": list(new.values()),
+                "text": {"maxCharacters": 4000},
+                "summary": {"schema": SUMMARY_SCHEMA},
+            },
+        )
+        # Exa может вернуть адрес в другом виде (без меток, с поддоменом) — берём ссылку из выдачи
+        for result in results:
+            ident = identify(result.get("url") or "", site)
+            if ident and ident.id in new:
+                result["url"] = new[ident.id]
+        return results
+
+    def _post(self, url: str, body: dict[str, Any]) -> list[dict[str, Any]]:
+        response = self._client.post(url, json=body)
         response.raise_for_status()
         data = response.json()
         self.cost_dollars += (data.get("costDollars") or {}).get("total") or 0.0

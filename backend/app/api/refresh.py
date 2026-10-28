@@ -56,6 +56,7 @@ def default_runner(state: RefreshState, sources: list[str], engine: Engine, prof
             region_code=region,
             limit=LIMITS.get(source, 30),
             on_progress=state.log.append,
+            engine=engine,  # база того, кто запустил поиск (владелец или пользователь)
         )
         state.new_vacancies += result.created
         state.cost_dollars += result.cost_dollars

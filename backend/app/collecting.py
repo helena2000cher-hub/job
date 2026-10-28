@@ -5,7 +5,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import httpx
-from sqlmodel import Session
+from sqlalchemy.engine import Engine
+from sqlmodel import Session, select
 
 from app.collectors import COLLECTORS, ExaCollector, SearchQuery
 from app.collectors.base import Collector
@@ -27,11 +28,16 @@ class CollectResult:
     updated: int = 0
     failed_queries: list[str] = field(default_factory=list)
     skipped: int = 0
+    already_known: int = 0  # Exa: найдены, но уже в базе — выжимку не заказывали
     cost_dollars: float = 0.0
 
 
-def make_collector(source: str, sites: list[str] | None = None) -> Collector:
-    return ExaCollector(sites) if source == "exa" else COLLECTORS[source]()
+def make_collector(
+    source: str, sites: list[str] | None = None, known_ids: set[str] | None = None
+) -> Collector:
+    if source == "exa":
+        return ExaCollector(sites, known_ids=known_ids)
+    return COLLECTORS[source]()
 
 
 def collect(
@@ -43,8 +49,14 @@ def collect(
     limit: int,
     sites: list[str] | None = None,
     on_progress: Callable[[str], None] = lambda _: None,
+    engine: Engine | None = None,
 ) -> CollectResult:
-    collector = make_collector(source, sites)
+    # Своя база у каждого пользователя: сохраняем туда, откуда запущен поиск
+    engine = engine or get_engine()
+    init_db(engine)
+    with Session(engine) as session:
+        known_ids = set(session.exec(select(Vacancy.id)).all())
+    collector = make_collector(source, sites, known_ids)
     result = CollectResult(source)
     vacancies: dict[str, Vacancy] = {}
 
@@ -63,8 +75,6 @@ def collect(
         vacancies.update((v.id, v) for v in found)
         on_progress(f"«{text}»: найдено {len(found)}, новых {new}")
 
-    engine = get_engine()
-    init_db(engine)
     with Session(engine, expire_on_commit=False) as session:
         stats = save_vacancies(session, vacancies.values())
 
@@ -72,4 +82,7 @@ def collect(
     result.created, result.updated = stats.created, stats.updated
     if isinstance(collector, ExaCollector):
         result.skipped, result.cost_dollars = collector.skipped, collector.cost_dollars
+        result.already_known = collector.already_known
+        if collector.already_known:
+            on_progress(f"Уже в базе, повторно не разбирали: {collector.already_known}")
     return result

@@ -97,12 +97,24 @@ def test_parse_web_result_uses_domain_as_source():
     assert v.is_remote is True  # модель не отметила, но в тексте явно сказано
 
 
-def make_collector(sites, requests, results):
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(json.loads(request.content))
-        return httpx.Response(200, json={"results": results, "costDollars": {"total": 0.012}})
+def make_collector(sites, requests, results, known_ids=None):
+    """Fake Exa: /search returns only links, /contents — the full results for asked links."""
+    by_url = {r["url"]: r for r in results}
 
-    return ExaCollector(sites, client=httpx.Client(transport=httpx.MockTransport(handler)))
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        requests.append(body)
+        if request.url.path == "/contents":
+            found = [by_url[u] for u in body["urls"] if u in by_url]
+            return httpx.Response(200, json={"results": found, "costDollars": {"total": 0.001}})
+        links = [{"url": r["url"], "title": "Вакансия"} for r in results]
+        return httpx.Response(200, json={"results": links, "costDollars": {"total": 0.007}})
+
+    return ExaCollector(
+        sites,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        known_ids=known_ids,
+    )
 
 
 def test_fetch_builds_requests_per_site():
@@ -111,16 +123,35 @@ def test_fetch_builds_requests_per_site():
 
     vacancies = list(collector.fetch(SearchQuery(text="бизнес-аналитик", remote_only=True)))
 
-    assert len(requests) == 2
-    hh, web = requests
+    # на каждый сайт: поиск только ссылок, затем выжимка новых ссылок одним запросом
+    assert len(requests) == 4
+    hh, hh_contents, web, _ = requests
     assert hh["query"] == "вакансия бизнес-аналитик удаленная работа"
     assert hh["includeDomains"] == ["hh.ru"]
+    assert hh["contents"] == {"text": False}  # поиск без текста и выжимки — дёшево
     assert "hh.ru" in web["excludeDomains"] and "includeDomains" not in web
-    assert hh["contents"]["summary"]["schema"]["required"] == ["is_open_vacancy", "title"]
+    assert hh_contents["urls"] == [HH_RESULT["url"]]
+    assert hh_contents["summary"]["schema"]["required"] == ["is_open_vacancy", "title"]
     assert "startPublishedDate" in hh
     # результат с hh.ru-адресом в режиме web — страница с домена hh.ru, тоже принимается как web
     assert [v.source for v in vacancies] == ["hh.ru", "perm.hh.ru"]
-    assert collector.cost_dollars == pytest.approx(0.024)
+    assert collector.cost_dollars == pytest.approx(0.016)
+
+
+def test_fetch_pays_summary_only_for_new_vacancies():
+    requests: list[dict] = []
+    new = {**HH_RESULT, "url": "https://hh.ru/vacancy/777"}
+    collector = make_collector(["hh.ru"], requests, [HH_RESULT, new], known_ids={"hh.ru:137463195"})
+
+    vacancies = list(collector.fetch(SearchQuery(text="аналитик")))
+
+    assert [v.external_id for v in vacancies] == ["777"]
+    assert requests[1]["urls"] == ["https://hh.ru/vacancy/777"]  # известную не разбираем
+    assert collector.already_known == 1
+
+    requests.clear()
+    assert list(collector.fetch(SearchQuery(text="аналитик"))) == []
+    assert len(requests) == 1  # всё уже известно — только поиск, без /contents
 
 
 def test_fetch_skips_non_remote_when_remote_only():
