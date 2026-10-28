@@ -68,7 +68,21 @@ AGGREGATORS = [
     "taylor.kz", "nesiditsa.ru", "pawetta.com", "dreamjob.ru", "deffic.ru", "hitit.one",
     "vakradar.ru", "remote-job.ru", "rabix.ru", "careerholo.com", "mindpal.co",
     "jobs.ita.am", "okjobs.co.za", "morocco24x7.com", "is-great.net",
+    # из реальных поисков (28.10.2026): перепосты и иностранные доски, ни одной хорошей вакансии
+    # на десятки оплаченных выжимок
+    "trabajos.univision.com", "offercatch.io", "posada24.pl", "vacario.ru", "*.joblum.com",
+    "jobleads.com", "jobswave.ru", "list.tg", "connect.tg", "tg.me", "offerstream.ru",
+    "donator.ge", "empleo24.es", "lookingforjob.ru", "robota.ua", "2hr.pl", "hirify.me",
+    "jobspring.pro", "promopoisk.com", "remotenex.us", "remoterocketship.com", "rockethunt.ai",
+    "teletype.in", "workbench.kz", "flagma.se", "flagma-tj.com", "bdjobs.com", "mnogo.work",
+    "udalenka.work", "hireseeker.ru", "jobs-radar.com", "jobrise.io", "glassever.com",
+    "freshjobsahead.com", "emploive.com", "kickstartremote.com", "jobpresshq.com",
+    "remoteitjobs.net", "yourlumio.com", "*.dedyn.io", "*.liveblog365.com",
+    "*.mysmartpros.com", "*.pragatishilclasses.org", "*.nepsetrading.com", "job.org.nz",
 ]  # fmt: skip
+# Российские доменные зоны: страница компании оттуда стоит выжимки даже с английским заголовком
+_RU_ZONES = (".ru", ".su", ".xn--p1ai", ".рф")
+_CYRILLIC = re.compile(r"[а-яё]", re.IGNORECASE)
 
 SUMMARY_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -134,8 +148,8 @@ class ExaCollector(Collector):
             new: dict[str, str] = {}  # id вакансии → ссылка из выдачи
             for result in self._search(site, query):
                 ident = identify(result.get("url") or "", site)
-                if ident is None:  # списки вакансий, статьи — не карточка вакансии
-                    self.skipped += 1
+                if ident is None or not _worth_reading(result, site):
+                    self.skipped += 1  # список вакансий, статья или иностранная страница
                 elif ident.id in self._known:
                     self.already_known += 1
                 else:
@@ -219,6 +233,18 @@ def identify(url: str, site: Site | None = None) -> Identity | None:
     external_id = hashlib.sha1(url.encode()).hexdigest()[:16]
     source = parsed.netloc.removeprefix("www.") or site.name
     return Identity(f"{source}:{external_id}", source, external_id, url)
+
+
+def _worth_reading(result: dict[str, Any], site: Site) -> bool:
+    """Decide by the free search result (link + title) whether to pay for the page's summary.
+
+    hh.ru и Хабр — всегда. Сайты компаний — если домен российский или заголовок по-русски:
+    иностранные доски (испанские, польские, американские) раньше съедали половину выжимок.
+    """
+    if site is not WEB:
+        return True
+    host = urlparse(result.get("url") or "").netloc.lower().split(":")[0]
+    return host.endswith(_RU_ZONES) or bool(_CYRILLIC.search(result.get("title") or ""))
 
 
 def site_for_url(url: str) -> Site:

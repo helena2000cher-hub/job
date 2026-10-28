@@ -107,7 +107,7 @@ def make_collector(sites, requests, results, known_ids=None):
         if request.url.path == "/contents":
             found = [by_url[u] for u in body["urls"] if u in by_url]
             return httpx.Response(200, json={"results": found, "costDollars": {"total": 0.001}})
-        links = [{"url": r["url"], "title": "Вакансия"} for r in results]
+        links = [{"url": r["url"], "title": r.get("title", "Вакансия")} for r in results]
         return httpx.Response(200, json={"results": links, "costDollars": {"total": 0.007}})
 
     return ExaCollector(
@@ -224,8 +224,25 @@ def test_web_skips_aggregators_and_pages_without_company(summary_fields):
     assert parse_result(result, WEB, allow_closed=True) is not None
 
 
+def test_web_pays_summary_only_for_russian_pages():
+    company = summary(company="ООО Ромашка", is_employer_page=True)
+    spanish = {"url": "https://jobs.example.com/a", "title": "Analista", "summary": company}
+    english_ru = {"url": "https://acme.ru/jobs/1", "title": "Python Developer", "summary": company}
+    russian_com = {"url": "https://acme.com/vac", "title": "Аналитик данных", "summary": company}
+    requests: list[dict] = []
+    collector = make_collector(["web"], requests, [spanish, english_ru, russian_com])
+
+    vacancies = list(collector.fetch(SearchQuery(text="аналитик")))
+
+    # испанскую страницу отсеяли по бесплатной выдаче — за её выжимку не платили
+    assert requests[1]["urls"] == ["https://acme.ru/jobs/1", "https://acme.com/vac"]
+    assert {v.source for v in vacancies} == {"acme.ru", "acme.com"}
+    assert collector.skipped == 1
+
+
 def test_known_aggregators_excluded_from_web_search():
     from app.collectors.exa import AGGREGATORS
 
-    for domain in ["jabka.work", "hirehi.ru", "sobes.tech", "*.hh.kz", "jobs.dou.ua"]:
+    for domain in ["jabka.work", "hirehi.ru", "sobes.tech", "*.hh.kz", "jobs.dou.ua",
+                   "offercatch.io", "trabajos.univision.com", "*.joblum.com"]:  # fmt: skip
         assert domain in AGGREGATORS
