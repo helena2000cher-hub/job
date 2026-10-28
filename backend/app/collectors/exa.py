@@ -2,8 +2,8 @@
 hh.ru (API closed since 2026), Хабр Карьера and companies' own career pages.
 
 Exa extracts structured fields itself (`contents.summary.schema`), so no extra LLM call is needed.
-Two steps to save money: a search without contents (~$0.007), then /contents with the summary
-(~$0.001 per page) only for links that are not in the database yet.
+Two steps to save money: an instant search without contents (~$0.004), then /contents with the
+summary (~$0.001 per page) only for links that are not in the database yet.
 Docs: https://exa.ai/docs/reference/search
 """
 
@@ -158,7 +158,7 @@ class ExaCollector(Collector):
         since = datetime.now(UTC) - timedelta(days=self._max_age_days)
         body: dict[str, Any] = {
             "query": " ".join(words),
-            "type": "auto",
+            "type": "instant",  # $4 за 1000 против $7 у auto; для поиска вакансий хватает
             "numResults": min(self._results_per_site, query.limit),
             "userLocation": "RU",
             "startPublishedDate": since.strftime("%Y-%m-%dT00:00:00Z"),

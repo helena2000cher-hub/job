@@ -51,7 +51,9 @@ def default_runner(state: RefreshState, sources: list[str], engine: Engine, prof
         state.log.append(f"Ищу на {SOURCE_TITLES.get(source, source)}…")
         result = collect(
             source,
-            profile.effective_queries(),  # только отмеченные профессии
+            # Exa платный за каждый запрос и ищет по смыслу — ему компактные запросы;
+            # бесплатным API (Работа России, SuperJob) — по одному слову, как раньше
+            profile.semantic_queries() if source == "exa" else profile.effective_queries(),
             remote_only=prefs.remote_only,
             region_code=region,
             limit=LIMITS.get(source, 30),

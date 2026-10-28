@@ -20,6 +20,7 @@ from app.llm import LLM, PolzaLLM
 
 PROFILE_PATH = DATA_DIR / "profile.json"
 RESUME_PATH = DATA_DIR / "resume.pdf"
+SKILLS_PER_QUERY = 4  # навыков в одном смысловом запросе к Exa
 
 DEFAULT_STOP_WORDS = ["склад", "кладовщик", "грузчик", "комплектовщик", "курьер", "холодные звонки"]
 
@@ -100,6 +101,24 @@ class Profile(BaseModel):
                 queries.append(q.strip())
         return queries or list(self.search_queries)  # ничего не выбрано — старый список
 
+    def semantic_queries(self, skills_per_query: int = SKILLS_PER_QUERY) -> list[str]:
+        """Few queries for meaning-based search (Exa): each query costs money regardless of size.
+
+        Одна профессия — один запрос со всеми её формулировками («Бизнес-аналитик или Системный
+        аналитик или BA»), навыки — группами по несколько. Поиск по смыслу понимает такие
+        запросы, а платим за каждый отдельный запрос. Выбор профессий и навыков не меняется.
+        """
+        queries: list[str] = []
+        if self.search_mode in ("professions", "both"):
+            for role, variants in self.query_plan():
+                names = _unique([role, *variants])
+                queries.append(" или ".join(names))
+        if self.search_mode in ("skills", "both"):
+            skills = _unique(self.search_skills)
+            for i in range(0, len(skills), skills_per_query):
+                queries.append("навыки: " + ", ".join(skills[i : i + skills_per_query]))
+        return _unique(queries) or self.effective_queries()
+
     def fingerprint(self) -> str:
         """Changes whenever the profile changes — cached match scores are then recomputed."""
         # Влияет только то, по чему вакансию ОЦЕНИВАЮТ. Имя, подпись, истории для писем,
@@ -116,6 +135,14 @@ class Profile(BaseModel):
 
 def _norm(text: str) -> str:
     return " ".join(text.lower().split())
+
+
+def _unique(items: list[str]) -> list[str]:
+    result: list[str] = []
+    for item in items:
+        if item.strip() and not any(_norm(item) == _norm(x) for x in result):
+            result.append(item.strip())
+    return result
 
 
 SYSTEM_PROMPT = """Ты — опытный IT-рекрутер.

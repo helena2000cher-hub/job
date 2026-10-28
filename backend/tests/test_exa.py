@@ -129,6 +129,7 @@ def test_fetch_builds_requests_per_site():
     assert hh["query"] == "вакансия бизнес-аналитик удаленная работа"
     assert hh["includeDomains"] == ["hh.ru"]
     assert hh["contents"] == {"text": False}  # поиск без текста и выжимки — дёшево
+    assert hh["type"] == "instant"
     assert "hh.ru" in web["excludeDomains"] and "includeDomains" not in web
     assert hh_contents["urls"] == [HH_RESULT["url"]]
     assert hh_contents["summary"]["schema"]["required"] == ["is_open_vacancy", "title"]

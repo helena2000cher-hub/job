@@ -148,6 +148,30 @@ def test_search_modes_professions_skills_both():
     assert queries[4:] == ["n8n", "RAG"]  # без дублей
 
 
+def test_semantic_queries_merge_variants_and_group_skills():
+    profile = _profile_with_cards()
+    profile.search_skills = ["n8n", "RAG", "Python", "BPMN", "SQL", "Google Таблицы"]
+
+    profile.search_mode = "both"
+    assert profile.semantic_queries() == [
+        "Бизнес-аналитик или ai инженер",  # одна профессия — один запрос со всеми названиями
+        "ai-инженер / llm-разработчик или AI инженер или LLM разработчик",
+        "Финансовый аналитик",
+        "навыки: n8n, RAG, Python, BPMN",  # навыки группами по 4
+        "навыки: SQL, Google Таблицы",
+    ]
+    assert len(profile.semantic_queries()) < len(profile.effective_queries())
+
+    profile.search_mode = "skills"
+    assert profile.semantic_queries(skills_per_query=3) == [
+        "навыки: n8n, RAG, Python",
+        "навыки: BPMN, SQL, Google Таблицы",
+    ]
+
+    profile.target_roles, profile.search_mode = [], "professions"
+    assert profile.semantic_queries() == ["старый запрос из резюме"]  # нечего группировать
+
+
 def test_search_settings_do_not_reset_scores():
     profile = _profile_with_cards()
     before = profile.fingerprint()
