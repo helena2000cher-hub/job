@@ -282,7 +282,10 @@ def _parse_summary(value: Any) -> dict[str, Any]:
 def _clean(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
-    value = re.sub(r"\s+", " ", value).strip()
+    # Exa иногда отдаёт переносы строк экранированными («кратко:\n- собирать…») — делаем
+    # из них настоящие; списки обязанностей так и остаются списками, а не сплошной строкой.
+    lines = (re.sub(r"\s+", " ", line).strip() for line in value.replace("\\n", "\n").split("\n"))
+    value = "\n".join(line for line in lines if line)
     return None if value.lower() in ("", "null", "none", "не указан", "не указано") else value
 
 

@@ -20,13 +20,17 @@ TONE_LABELS = {"business": "Деловой тон", "friendly": "Дружелю�
 
 
 def mark_no_response(session: Session, today: date | None = None) -> int:
-    """Move «applied» to «no_response» after NO_RESPONSE_DAYS days without any change."""
+    """Move «applied» to «no_response» after NO_RESPONSE_DAYS days without any news.
+
+    News = the application itself, a stage change or the employer's «we are reviewing» reply.
+    """
     today = today or date.today()
     deadline = today - timedelta(days=NO_RESPONSE_DAYS)
     moved = 0
     for a in session.exec(select(Application).where(Application.stage == "applied")).all():
         last_change = (a.stage_changed_at or datetime.min).date()
-        if a.applied_at and a.applied_at <= deadline and last_change <= deadline:
+        replied = a.employer_replied_at or date.min
+        if a.applied_at and max(a.applied_at, replied) <= deadline and last_change <= deadline:
             a.stage = "no_response"
             a.stage_changed_at = utcnow()
             a.updated_at = utcnow()
@@ -122,6 +126,9 @@ def compute_analytics(
             "days_since": (today - a.applied_at).days if a.applied_at else None,
             "has_letter": bool(a.cover_letter),
             "notes": a.notes,
+            "employer_replied_at": a.employer_replied_at.isoformat()
+            if a.employer_replied_at
+            else None,
         }
         for a, v, m in sorted(sent_rows, key=lambda r: r[0].applied_at or date.min, reverse=True)
     ]
@@ -136,6 +143,12 @@ def compute_analytics(
         "rejected": stages.get("rejected", 0),
         "no_response": stages.get("no_response", 0),
         "waiting": stages.get("applied", 0),
+        # Ответили «рассматриваем», а решения пока нет — отличаем от полной тишины
+        "acknowledged": sum(
+            1
+            for a, _, _ in sent_rows
+            if a.employer_replied_at and a.stage in ("applied", "no_response")
+        ),
         "response_rate": round(positive / sent, 3) if sent else None,
         "by_letter": _rows(by_letter),
         "by_score": _rows(by_score, ["80+", "60–79", "до 60", "без оценки"]),

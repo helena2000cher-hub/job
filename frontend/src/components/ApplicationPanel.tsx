@@ -1,4 +1,4 @@
-import { Check, Copy, Sparkles, Trash2 } from 'lucide-react'
+import { Check, Copy, MessageSquare, Sparkles, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { api } from '../api'
@@ -97,6 +97,14 @@ export function ApplicationPanel({ vacancyId, application, onChange }: Props) {
               onCommit={(contact) => update({ contact })}
             />
           </Labeled>
+          {(application.employer_replied_at || ['applied', 'no_response'].includes(application.stage)) && (
+            <div className="sm:col-span-2">
+              <EmployerReply
+                value={application.employer_replied_at}
+                onChange={(employer_replied_at) => update({ employer_replied_at })}
+              />
+            </div>
+          )}
           <div className="sm:col-span-2">
             <Labeled label="Заметки">
               <BlurInput
@@ -112,6 +120,41 @@ export function ApplicationPanel({ vacancyId, application, onChange }: Props) {
 
       {error && <p className="text-xs text-rose-600">{error}</p>}
     </section>
+  )
+}
+
+/**
+ * «Работодатель ответил: рассматривают» — частый ответ на hh.ru без приглашения и без отказа.
+ * Отсчёт 10 дней до «Без ответа» идёт с даты ответа; в аналитике такие отклики отдельно.
+ */
+function EmployerReply({ value, onChange }: { value: string | null; onChange: (date: string | null) => void }) {
+  if (!value) {
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Button onClick={() => onChange(new Date().toLocaleDateString('sv-SE'))}>
+          <MessageSquare className="h-4 w-4" /> Работодатель ответил: рассматривают
+        </Button>
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          Не приглашение и не отказ — отсчёт до «Без ответа» начнётся заново
+        </span>
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900 dark:bg-sky-500/10 dark:text-sky-200">
+      <MessageSquare className="h-4 w-4 shrink-0" aria-hidden />
+      <span>Ответили: рассматривают</span>
+      <input
+        type="date"
+        aria-label="Дата ответа работодателя"
+        value={value}
+        onChange={(e) => e.target.value && onChange(e.target.value)}
+        className="rounded-md border-0 bg-white px-2 py-0.5 text-sm ring-1 ring-inset ring-sky-200 dark:bg-slate-950 dark:ring-sky-500/30"
+      />
+      <button type="button" onClick={() => onChange(null)} className="ml-auto text-xs underline-offset-2 hover:underline">
+        снять отметку
+      </button>
+    </div>
   )
 }
 

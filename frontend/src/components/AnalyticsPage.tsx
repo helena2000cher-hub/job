@@ -76,11 +76,12 @@ export function AnalyticsPage({ onGoToFeed }: { onGoToFeed: () => void }) {
         </EmptyState>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             <Stat label="Отправлено" value={data.sent} />
             <Stat label="Приглашений" value={data.positive} hint="анкета, тестовое, собеседование, оффер" />
             <Stat label="Доля приглашений" value={rate} />
             <Stat label="Ждут ответа" value={data.waiting} />
+            <Stat label="Ответили без решения" value={data.acknowledged} hint="«рассматриваем, сообщим»" />
             <Stat label="Без ответа" value={data.no_response} />
             <Stat label="Отказы" value={data.rejected} />
           </div>

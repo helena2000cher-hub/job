@@ -4,7 +4,14 @@ import httpx
 import pytest
 
 from app.collectors.base import SearchQuery
-from app.collectors.exa import HABR, HH, WEB, ExaCollector, parse_result
+from app.collectors.exa import HABR, HH, WEB, ExaCollector, _clean, parse_result
+
+
+def test_clean_turns_escaped_newlines_into_lines():
+    assert _clean("Обязанности:\\n-  собирать  ассистентов;\\n\\n- RAG") == (
+        "Обязанности:\n- собирать ассистентов;\n- RAG"
+    )
+    assert _clean("  null ") is None
 
 
 def summary(**fields) -> str:

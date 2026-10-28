@@ -98,6 +98,7 @@ class ApplicationOut(BaseModel):
     cover_letter_tone: str | None = None
     updated_at: datetime
     stage_changed_at: datetime | None = None
+    employer_replied_at: date | None = None
 
 
 class TrackerItem(FeedItem):
@@ -147,6 +148,7 @@ class ApplicationIn(BaseModel):
     stage: Stage | None = None
     notes: str | None = None
     contact: str | None = None
+    employer_replied_at: date | None = None  # null — снять отметку «ответили»
     applied_at: date | None = None
     cover_letter: str | None = None
     cover_letter_subject: str | None = None
@@ -690,9 +692,11 @@ def create_app(
         application = existing or Application(vacancy_id=vacancy_id)
         old_stage = existing.stage if existing else None
         for field, value in body.model_dump(exclude_unset=True).items():
-            if value is not None or field == "applied_at":
+            if value is not None or field in ("applied_at", "employer_replied_at"):
                 setattr(application, field, value)
-        if body.stage is not None and body.stage != old_stage:
+        if body.employer_replied_at and application.stage == "no_response" and not body.stage:
+            application.stage = "applied"  # ответ пришёл — это уже не «Без ответа»
+        if application.stage != old_stage:
             application.stage_changed_at = utcnow()
         if application.stage == "applied" and application.applied_at is None:
             application.applied_at = date.today()  # дата отклика проставляется сама

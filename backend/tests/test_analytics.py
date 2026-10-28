@@ -106,6 +106,23 @@ def test_mark_no_response_after_10_days(session):
     assert mark_no_response(session, TODAY) == 0  # повторно ничего не меняет
 
 
+def test_employer_reply_restarts_no_response_timer(session):
+    replied = TODAY - timedelta(days=4)
+    add_app(session, 1, "applied", applied_days_ago=15, employer_replied_at=replied)
+    add_app(session, 2, "applied", applied_days_ago=25, employer_replied_at=TODAY - timedelta(11))
+
+    assert mark_no_response(session, TODAY) == 1  # ответ был 4 дня назад — ещё ждём решения
+    assert session.get(Application, "test:1").stage == "applied"
+    assert session.get(Application, "test:2").stage == "no_response"
+
+    stats = compute_analytics(session, None, TODAY)
+    assert stats["acknowledged"] == 2  # ответили без решения — отдельно от полной тишины
+    assert {i["employer_replied_at"] for i in stats["sent_list"]} == {
+        replied.isoformat(),
+        (TODAY - timedelta(11)).isoformat(),
+    }
+
+
 def test_compute_analytics(session):
     fp = "profile-fp"
     add_app(session, 1, "interview", 5, cover_letter="п", cover_letter_tone="friendly")
@@ -192,6 +209,24 @@ def test_stage_change_time_and_letter_tone(client):
     assert letter["cover_letter_tone"] == "friendly"
 
     assert client.put("/api/applications/test:1", json={"stage": "no_response"}).status_code == 200
+
+
+def test_employer_reply_mark_via_api(client):
+    engine = client.app.state.refresh._engine
+    with Session(engine) as s:
+        s.add(make_vacancy(1, "Аналитик"))
+        s.commit()
+    client.put("/api/applications/test:1", json={"stage": "no_response"})
+
+    replied = client.put("/api/applications/test:1", json={"employer_replied_at": "2026-10-27"})
+    body = replied.json()
+    assert body["employer_replied_at"] == "2026-10-27"
+    assert body["stage"] == "applied"  # ответ пришёл — карточка вернулась из «Без ответа»
+
+    cleared = client.put("/api/applications/test:1", json={"employer_replied_at": None}).json()
+    assert cleared["employer_replied_at"] is None and cleared["stage"] == "applied"
+    notes = client.put("/api/applications/test:1", json={"notes": "x"}).json()
+    assert notes["employer_replied_at"] is None  # другие правки отметку не трогают
 
 
 def test_analytics_and_advice_endpoints(client):

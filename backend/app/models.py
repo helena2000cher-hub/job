@@ -99,6 +99,9 @@ class Application(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
     stage_changed_at: datetime | None = None
+    # Работодатель ответил без решения («откликов много, сообщим») — не приглашение и не отказ.
+    # Отсчёт до «Без ответа» идёт с этой даты, в аналитике такие отклики считаются отдельно.
+    employer_replied_at: date | None = None
 
 
 class Match(SQLModel, table=True):

@@ -24,6 +24,7 @@ export interface Application {
   cover_letter_tone: string | null
   updated_at: string
   stage_changed_at: string | null
+  employer_replied_at: string | null // ответили «рассматриваем» без решения
 }
 
 export interface FeedItem {
@@ -234,6 +235,7 @@ export interface Analytics {
   rejected: number
   no_response: number
   waiting: number
+  acknowledged: number // ответили «рассматриваем», решения пока нет
   response_rate: number | null
   by_letter: RateRow[]
   by_score: RateRow[]
@@ -256,6 +258,7 @@ export interface SentItem {
   days_since: number | null
   has_letter: boolean
   notes: string
+  employer_replied_at: string | null
 }
 
 export interface ManualApplicationIn {

@@ -1,4 +1,4 @@
-import { Mail } from 'lucide-react'
+import { Mail, MessageSquare } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import type { DragEvent } from 'react'
 import { api } from '../api'
@@ -202,6 +202,11 @@ function TrackerCard({
 
       <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
         {a.applied_at && <span>отклик {formatDate(a.applied_at)}</span>}
+        {a.employer_replied_at && (
+          <span className="inline-flex items-center gap-0.5 text-sky-700 dark:text-sky-300" title="Работодатель ответил: рассматривают">
+            <MessageSquare className="h-3 w-3" /> ответили {formatDate(a.employer_replied_at)}
+          </span>
+        )}
         {a.cover_letter && (
           <span className="inline-flex items-center gap-0.5" title="Есть сопроводительное письмо">
             <Mail className="h-3 w-3" /> письмо

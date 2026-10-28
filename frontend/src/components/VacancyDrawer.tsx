@@ -208,6 +208,8 @@ function SkillList({ title, items, tone }: { title: string; items: string[]; ton
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   if (!children) return null
+  // Вакансии, собранные до исправления, хранят переносы строк текстом «\n»
+  if (typeof children === 'string') children = children.replaceAll('\\n', '\n')
   return (
     <section>
       <h3 className="mb-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h3>
